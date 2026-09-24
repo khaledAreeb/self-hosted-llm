@@ -79,10 +79,25 @@ Add `"stream": true` for incremental tokens.
 and CUDA graph capture now cached in the `vllm_cache` Volume. Later cold starts
 should be faster; measure before relying on a shorter client timeout.
 
-**Responses carry heavy reasoning overhead.** A request for "exactly one short
-sentence" produced 47 reasoning tokens and 7 visible ones. Reasoning arrives in
-a separate `reasoning` field, so it will not pollute `content`, but users do
-wait for it.
+**Thinking is disabled by default.** This model ships with `xhigh` reasoning
+effort, which made it unusable: a request for a 400-word explanation spent all
+800 available tokens reasoning and returned `content: None`. The server now
+sets `--default-chat-template-kwargs '{"enable_thinking": false}'`.
+
+To get reasoning back for a hard question, ask for it per request — request-level
+kwargs always beat the server default:
+
+```json
+{
+  "model": "qwen3.8-27b",
+  "messages": [{"role": "user", "content": "..."}],
+  "chat_template_kwargs": {"enable_thinking": true}
+}
+```
+
+Set this on the **vLLM side**, not in LiteLLM: `chat_template_kwargs` is a vLLM
+extension rather than part of the OpenAI spec, so routing it through a proxy
+means trusting that proxy to forward a non-standard field.
 
 ---
 
@@ -93,29 +108,64 @@ team is ~90 min/day of paid idle GPU. Do not drop below ~2 minutes: a user who
 pauses 90 seconds to read an answer would otherwise trigger a cold start
 mid-conversation.
 
-**Do not enable LiteLLM background health checks for this model.** They poll
-every 300 seconds by default, which holds the container permanently awake.
-At ~$2.54/hr that exhausts a $30 budget in roughly 12 hours **with zero user
-requests**. Three settings are required, because one is known to be
-insufficient:
+## LiteLLM gateway configuration
+
+> ### DO NOT ENABLE BACKGROUND HEALTH CHECKS FOR THIS MODEL
+>
+> LiteLLM polls every configured model every **300 seconds** by default. The
+> idle window here is also 300 seconds, so polling holds the GPU awake
+> permanently. At ~$2.94/hr that drains a $30 budget in roughly **10 hours with
+> zero user requests** — and shortening the idle window makes it worse, not
+> better, because each cycle then pays a fresh cold start.
+>
+> **Three** settings are required. One is not enough: there is an open LiteLLM
+> defect where the internal health check still crawls configured models despite
+> the per-model flag.
+
+This is the verified working configuration:
 
 ```yaml
-general_settings:
-  background_health_checks: false
-  health_check_skip_disabled_background_models: true
-
 model_list:
   - model_name: qwen3.8-27b
     litellm_params:
-      model: openai/Qwen/Qwen3.8-27B-FP8
+      model: openai/Qwen/Qwen3.8-27B-FP8            # openai/ prefix + the name vLLM serves
       api_base: https://dev-khaled-areeb--qwen38-27b-serve.modal.run/v1
-      api_key: os.environ/MODAL_PROXY_TOKEN   # the wk-....ws-... bearer form
+      api_key: os.environ/MODAL_PROXY_TOKEN         # the wk-....ws-... bearer form
+      timeout: 900                                  # must exceed the cold start
+      stream_timeout: 900
     model_info:
-      disable_background_health_check: true
+      disable_background_health_check: true         # suppression 3 of 3
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  background_health_checks: false                   # suppression 1 of 3
+  health_check_skip_disabled_background_models: true  # suppression 2 of 3
+
+router_settings:
+  num_retries: 0        # a slow cold start must not multiply into containers
+
+litellm_settings:
+  num_retries: 0
+  telemetry: False
 ```
 
-Verify suppression by leaving it idle overnight and checking the Modal billing
-dashboard reads zero — configuration inspection alone cannot confirm it.
+Keep this in a **separate config file** if your gateway serves other models —
+`num_retries: 0` applied globally would affect all of them.
+
+**Timeout must exceed the cold start.** Measured cold starts: 602 s, then
+514 s, then 428 s as the compile cache filled. 900 s leaves headroom. A shorter
+timeout fails requests while the backend is starting perfectly normally.
+
+**Verify suppression by billing, not by config.** Leave the gateway running
+overnight with no user activity and confirm the Modal dashboard shows zero
+GPU cost. Reading the config proves nothing — that is the whole point of the
+check. Do **not** stop the Modal app to make this pass; stopping it would
+conceal a polling defect rather than detect it.
+
+**Reasoning appears as `reasoning_content`.** LiteLLM renames the model's
+`reasoning` field to the conventional OpenAI-compatible name. With thinking
+disabled by default this is usually empty, but clients that request thinking
+per-request will receive it there rather than in `content`.
 
 **Never delete the Volumes to save money.** Storage is free below 1 TiB and
 these use ~33 GiB. Deleting saves nothing and costs a 28 GB re-download.

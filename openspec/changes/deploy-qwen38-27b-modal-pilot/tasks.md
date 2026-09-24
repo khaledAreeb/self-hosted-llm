@@ -36,7 +36,7 @@
 
 ## 4. Gateway integration
 
-- [ ] 4.1 Check the remaining Modal balance and record it in `NOTES.md` before starting this group
+- [x] 4.1 Check the remaining Modal balance and record it in `NOTES.md` before starting this group
 - [x] 4.2 Add the model to the LiteLLM config as an OpenAI-compatible provider pointing at the Modal endpoint, with `api_key` set to the combined Modal bearer token sourced from an environment variable rather than a literal — Modal accepts the token pair as a standard `Authorization: Bearer wk-....ws-...` header, so no custom-header support is required from LiteLLM
 - [x] 4.2a Probe the gateway-to-backend link by sending a request through LiteLLM with a deliberately invalid token, verifying Modal returns an authentication rejection at its edge with no container start and no GPU charge — this settles whether credentials reach the backend at zero cost, before any real spend
 - [x] 4.3 Disable LiteLLM background health checks globally, disable them for this model specifically, and exclude the model from on-demand health probes — all three settings, because one is known to be insufficient — verifying each appears in the config
@@ -49,11 +49,11 @@
 - [ ] 4.9a If the polling source cannot be traced after 4.9, adopt `modal app stop` between sessions as the fallback control and record in `NOTES.md` that the overnight check was never passed, verifying the team is told the endpoint must be redeployed before use
 - [ ] 4.9b Confirm the deployment stays up for the remainder of the pilot rather than being stopped nightly, verifying `NOTES.md` records why — stopping it would make the 4.8 check pass automatically and conceal a polling defect rather than detect it
 - [ ] 4.10 Mint per-user virtual keys with rate limits set high enough for interactive work but low enough to bound a runaway client, verifying by exceeding the limit with a test key and observing rejection
-- [ ] 4.11 Document the LiteLLM configuration and the reason health checks must stay disabled in `README.md`, verifying the warning is prominent enough that a future operator will not re-enable them
+- [x] 4.11 Document the LiteLLM configuration and the reason health checks must stay disabled in `README.md`, verifying the warning is prominent enough that a future operator will not re-enable them
 
 ## 5. Pilot evidence collection
 
-- [ ] 5.1 Check the remaining Modal balance and record it in `NOTES.md`, confirming at least 7 GPU-hours remain for the trial
+- [x] 5.1 Check the remaining Modal balance and record it in `NOTES.md`, confirming at least 7 GPU-hours remain for the trial
 - [ ] 5.2 Assemble a fixed evaluation set of 20-50 representative English tasks drawn from real company work, saved to `eval/tasks.md`, verifying each entry is a concrete task rather than a generic prompt
 - [ ] 5.3 Run the evaluation set against the deployment and retain all outputs under `eval/baseline/`, verifying the run is reproducible and the outputs are complete
 - [x] 5.4 Measure warm-request time to first token and sustained output tokens per second, recording both in `NOTES.md` and verifying the figures come from timed requests rather than theoretical bandwidth calculations

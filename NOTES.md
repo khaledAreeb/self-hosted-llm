@@ -24,6 +24,16 @@ the first real invoice.
 |---|---|---|---|---|
 | 2026-09-24 | Image build + first download attempt (CPU only, ~90s) | **$0.03** | $29.97 | Modal dashboard |
 | 2026-09-24 | Group 3 balance check (task 3.1), above the $25 halt threshold | — | $29.97 | Modal dashboard |
+| 2026-09-24 | Stage 1 + gateway verification complete (tasks 4.1, 5.1) | **$2.58 cumulative** | **$27.42** | Modal dashboard |
+
+**Spend to date: $2.58 of $30.00.** At ~$2.94/hr effective on A100-80GB that
+leaves roughly **9.3 GPU-hours**, comfortably above the 7-hour floor task 5.1
+requires for the team trial.
+
+Where the $2.58 went: four cold starts at ~7-10 minutes each dominate it. The
+28 GB download cost $0.03, and every authentication test cost nothing because
+Modal rejects at its edge. Cold starts are the only meaningful expense so far,
+which is what makes the stage 4 memory-snapshot work worth considering.
 
 The download step costs about **$0.03**, not the $1-2 that was estimated before
 the first run. The estimate was roughly 50x too high: the work is CPU-only, the
