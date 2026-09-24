@@ -346,6 +346,89 @@ than dropped: 47 `reasoning_content` chunks against 5 `content` chunks in the
 streamed response. Clients that understand `reasoning_content` will render
 thinking separately; those that do not will simply show the answer.
 
+### 2026-09-24 — GPU memory snapshots: tried, measured, reverted
+
+**Outcome: net negative for this model. Reverted.** Cost of finding out: ~$3.90.
+
+The hypothesis was well-founded. vLLM reported that of a 319 s cold start,
+`init engine (profile, create kv cache, warmup model) took 220.92 s` — 69% of
+the total, and exactly what a snapshot skips. Compilation had already fallen to
+1.44 s, so no further free improvement was coming.
+
+Implementation required restructuring `deploy.py` from a function into a class
+with `@modal.enter(snap=True/False)` hooks, vLLM sleep mode
+(`--enable-sleep-mode`, `VLLM_SERVER_DEV_MODE=1`), a warmup request, and
+`/sleep?level=1` plus `/wake_up` orchestration. Memory went 32 → 64 GiB because
+level-1 sleep offloads 28.9 GiB of weights to CPU RAM; the dashboard later
+showed 49.6 GiB actually in use, confirming 32 GiB would have failed.
+
+Five measured cold starts with snapshots enabled:
+
+| Run | Duration | What happened |
+|---|---|---|
+| 1 | 743 s | snapshot setup |
+| 2 | 580 s | snapshot setup |
+| 3 | **41 s** | genuine restore — weights + KV cache woke in 3.58 s |
+| 4 | 784 s | re-created the snapshot instead of restoring |
+| 5 | 522 s | slow again |
+
+Median **580 s**, mean **534 s**, against a **319 s** baseline without
+snapshots. One restore in five worked; the rest paid the full setup cost, which
+exceeds a plain cold start.
+
+The decisive argument is variance rather than the average. A 784 s worst case is
+**13 minutes**, against a predictable ~5 minutes before. For a pilot whose
+purpose is partly to make a good impression, unpredictable 41 s-to-13 min is
+worse than reliable 5 min.
+
+Modal's published 10x figure comes from a **3B** model. At 28.9 GiB the snapshot
+does not reliably stabilise — that appears to be a size effect, and it is a
+result nobody has published.
+
+A process note worth keeping: run 3's 41 s was reported here as promising before
+runs 4 and 5 existed. One good measurement surrounded by bad ones is a
+hypothesis, not a result, and it should not have been framed as anything more.
+Equally, runs 1 and 2 were called a failure prematurely when Modal's
+documentation had already said snapshots need up to five cold starts to become
+effective. Both errors came from concluding before the evidence was in.
+
+### 2026-09-24 — Post-revert verification (task 6.4)
+
+| Check | Result |
+|---|---|
+| Cold start | **300 s** — below the 319 s baseline |
+| Sanity request | 200 OK, 1.04 s, `"OK."` |
+| 400-word test | 200 OK, 12.92 s, `finish_reason=stop` |
+| Visible tokens | **578**, reasoning 0, **3,257 characters** |
+
+Byte-for-byte the same output as before the snapshot experiment. The revert is
+clean and the endpoint is fully working.
+
+**A transient HTTP 500 appeared on the first attempt**, with
+`modal-http: internal error: status InternalFailure: Server has lost track of
+input`. That is a Modal platform error, not a vLLM one — vLLM logged
+`GET /v1/models 200 OK` throughout. It did not reproduce.
+
+The probable cause was the test harness rather than the deployment: the
+readiness poll fired every 3 s for 447 s, queueing roughly 150 inputs against
+`max_inputs=32`. Polling every 10 s with a 5 s settle after readiness produced
+a clean run. Worth remembering when writing load tests against a scale-to-zero
+backend — aggressive polling during a cold start is itself a load pattern.
+
+**The compile cache recovered on its own.** Changing the image to add
+`VLLM_SERVER_DEV_MODE` for the experiment, then removing it, partially
+invalidated `torch.compile`:
+
+| Run | Init engine | Compilation |
+|---|---|---|
+| Baseline, warm cache | 220.92 s | 1.44 s |
+| First run after revert | 256.59 s | 16.60 s |
+| Second run after revert | — | recovered, total 300 s |
+
+A cost of the experiment worth anticipating next time: **changing the image to
+test something invalidates the cache that made the baseline fast**, so the first
+measurements after any image change are not comparable to earlier ones.
+
 ## Open items
 
 - [ ] Confirm CPU/memory really are billed additively (first invoice).

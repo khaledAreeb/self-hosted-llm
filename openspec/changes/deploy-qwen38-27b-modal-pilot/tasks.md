@@ -68,10 +68,10 @@
 
 > Optional. Skip this group entirely if Stage 3 cold starts proved acceptable to users or if budget is short — the pilot is already complete without it.
 
-- [ ] 6.1 Check the remaining Modal balance and skip this group if under 2 GPU-hours
-- [ ] 6.2 Enable Modal memory snapshots and GPU snapshotting on the serving class, verifying the deploy succeeds and the endpoint still answers correctly
-- [ ] 6.3 Measure the cold start duration with snapshots enabled and compare against the 3.10 baseline, recording both figures and the improvement factor in `NOTES.md`
-- [ ] 6.4 If snapshots degrade reliability or produce incorrect output, revert to the unsnapshotted configuration and record the outcome, verifying the endpoint returns to correct behavior
+- [x] 6.1 Check the remaining Modal balance and skip this group if under 2 GPU-hours
+- [x] 6.2 Enable Modal memory snapshots and GPU snapshotting on the serving class, verifying the deploy succeeds and the endpoint still answers correctly
+- [x] 6.3 Measure the cold start duration with snapshots enabled and compare against the 3.10 baseline, recording both figures and the improvement factor in `NOTES.md`
+- [x] 6.4 If snapshots degrade reliability or produce incorrect output, revert to the unsnapshotted configuration and record the outcome, verifying the endpoint returns to correct behavior
 
 ## 7. Production forecast and handoff
 
