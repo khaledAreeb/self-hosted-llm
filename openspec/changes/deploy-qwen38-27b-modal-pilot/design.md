@@ -48,16 +48,71 @@ AWQ INT4 is genuinely attractive later — the best-documented community build m
 
 ### Run on A100-40GB, with L40S as the fallback
 
+> **Superseded by measurement on 2026-09-24.** A100-40GB was chosen first and
+> failed with CUDA OOM. See *Corrected memory model* below. The deployment now
+> runs on **A100-80GB**. The reasoning in this section is retained because its
+> bandwidth argument still holds and still drives the final choice.
+
 | GPU | Effective $/hr | Hours for $30 | Est. decode | KV headroom |
 |---|---|---|---|---|
 | A10 24GB | ~$1.55 | ~19.4 | ~20 tok/s | ~2 GB — too tight |
-| L40S 48GB | ~$2.39 | ~12.5 | ~22 tok/s | ~18 GB |
-| **A100-40GB** | **~$2.54** | **~11.8** | **~39 tok/s** | **~9 GB** |
-| A100-80GB | ~$2.94 | ~10.2 | ~51 tok/s | ~48 GB |
+| L40S 48GB | ~$2.39 | ~12.5 | ~22 tok/s | 0.8 GB margin — too tight |
+| ~~A100-40GB~~ | ~~$2.54~~ | ~~11.8~~ | ~~39 tok/s~~ | **OOM — does not fit** |
+| **A100-80GB** | **~$2.94** | **~10.1** | **~51 tok/s** | **~29.6 GB margin** |
 
-A100-40GB costs 0.7 hours against the L40S and returns roughly 1.8x the decode speed, because decode is memory-bandwidth-bound and the A100's HBM2e (~1.55 TB/s) far exceeds the L40S's GDDR6 (~864 GB/s). For a pilot whose purpose is partly to impress, perceived speed is the product.
+Decode is memory-bandwidth-bound, so the A100's HBM2e (~1.55 TB/s on the 40 GB
+part, ~2.0 TB/s on the 80 GB part) far exceeds the L40S's GDDR6 (~864 GB/s).
+For a pilot whose purpose is partly to impress, perceived speed is the product.
+That argument survives the OOM and is why A100-80GB was preferred over L40S
+once the 40 GB part was ruled out: it buys roughly 2.3x the decode speed for
+2.3 fewer hours of budget, and removes the memory risk entirely.
 
-The A10 is rejected despite offering the most hours: it would require an INT4 build, leaves roughly 2 GB for KV cache, and still only matches the L40S on speed. A pilot that runs out of memory in front of the team costs more than the hours it saves.
+The A10 is rejected despite offering the most hours: it would require an INT4
+build, leaves roughly 2 GB for KV cache, and still only matches the L40S on
+speed. A pilot that runs out of memory in front of the team costs more than the
+hours it saves.
+
+### Corrected memory model
+
+The original arithmetic here computed KV cache **per token** — 16 attention
+layers x 4 KV heads x 256 head_dim x 2 (K and V) x 1 byte at FP8 = ~32 KB/token
+— and concluded that ~9 GB of headroom on a 40 GB card was ample. The per-token
+figure is correct. The conclusion was wrong, because it ignored allocation
+granularity.
+
+vLLM logs the reason during startup:
+
+```
+Setting attention block size to 1568 tokens to ensure that attention
+page size is >= mamba page size.
+Padding mamba page size by 0.13% to ensure that mamba page size and
+attention page size are exactly equal.
+```
+
+The Gated DeltaNet layers carry a fixed-size recurrent state per sequence, and
+vLLM requires the attention page size to match it. That inflates the attention
+block from the usual 16 tokens to **1568 tokens**, so the smallest possible KV
+allocation is **12.25 GiB**. The same hybrid architecture that makes KV cache
+cheap per token makes it expensive per block.
+
+Measured requirement:
+
+| Component | Predicted | Measured |
+|---|---|---|
+| Weights | ~28 GB | **28.9 GiB** |
+| Resident before KV alloc | — | **30.13 GiB** |
+| Minimum KV allocation | ~5 GB spare assumed sufficient | **12.25 GiB required** |
+| **Total** | **~31 GB** | **~42.4 GiB** |
+
+The lesson generalises beyond this model: for hybrid linear-attention
+architectures, size the GPU from the minimum *page* allocation, not from
+per-token cache arithmetic.
+
+Separately, the OOM confirmed what it was *not*. FP8-Marlin on Ampere works —
+vLLM reported `Weight-only FP8 compression will be used leveraging the Marlin
+kernel`, the model loaded fully in 18.13 seconds from the Volume, and
+`--reasoning-parser qwen3` was accepted. The L40S fallback that task 3.6 exists
+to trigger was therefore never needed for its original reason.
 
 The fallback exists because A100 is Ampere and has no native FP8 tensor cores. vLLM runs FP8 checkpoints there as weight-only W8A16 through FP8 Marlin: the 28 GB memory saving is preserved, which is what drives decode speed, but compute dequantizes to BF16. Block-wise FP8 support landed in Marlin well before the vLLM version this model requires, so this should work — but it has not been verified against this model's DeltaNet layers specifically. If anything misbehaves, L40S is the path vLLM's own published recipe verified, with native Ada FP8.
 
@@ -96,10 +151,18 @@ Proxy authentication at the platform edge is chosen over application-level API k
 Team access via a chat UI was considered and rejected. The company already runs LiteLLM, which resolves the protocol mismatch the edge-auth decision created: users present standard bearer tokens, LiteLLM injects the platform's custom auth headers upstream.
 
 ```
-  users --Bearer sk-user-key--> LiteLLM --platform auth headers--> endpoint
+  users --Bearer sk-user-key--> LiteLLM --Bearer wk-....ws-...--> endpoint
 ```
 
-This also deletes a requirement from the build. LiteLLM already records per-request timestamps, token counts, and user attribution — which is precisely the per-user data `specs/cost-observability` requires. No instrumentation needs to be written into the deployment itself.
+The protocol mismatch turns out not to exist. Modal accepts a proxy token pair **either** as two custom headers (`Modal-Key` / `Modal-Secret`) **or** as a single standard bearer token of the form `Authorization: Bearer wk-<id>.ws-<secret>`. The second form is what LiteLLM already sends natively for any OpenAI-compatible provider, so the backend credential is simply that model's `api_key`. No custom-header support, no relay process, and no dependence on `extra_headers` is required.
+
+This matters because a LiteLLM feature request for Modal proxy authentication (BerriAI/litellm#11021) was closed as not planned, with the reporter seeing `modal-http: missing credentials for proxy authorization`. Routing through the bearer form sidesteps that gap entirely rather than depending on a path the maintainers declined to support.
+
+Because rejection happens at Modal's edge, the link can also be verified for free: a request carrying an invalid token is refused before any container starts, so confirming that credentials actually reach the backend costs no GPU time.
+
+The choice also deletes a requirement from the build. LiteLLM already records per-request timestamps, token counts, and user attribution — which is precisely the per-user data `specs/cost-observability` requires. No instrumentation needs to be written into the deployment itself.
+
+One operational consequence: the tokens belong to the **caller**, never to the deployment. Modal's container has no use for them, so they are held as an environment variable on the LiteLLM host and in a gitignored `.env` for local testing — not in a Modal Secret. Best practice is one token per consumer, so that revoking the gateway's access does not also break the operator's own testing.
 
 ### Suppress gateway polling — the single largest budget risk
 
