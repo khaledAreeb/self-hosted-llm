@@ -37,13 +37,13 @@
 ## 4. Gateway integration
 
 - [ ] 4.1 Check the remaining Modal balance and record it in `NOTES.md` before starting this group
-- [ ] 4.2 Add the model to the LiteLLM config as an OpenAI-compatible provider pointing at the Modal endpoint, with `api_key` set to the combined Modal bearer token sourced from an environment variable rather than a literal — Modal accepts the token pair as a standard `Authorization: Bearer wk-....ws-...` header, so no custom-header support is required from LiteLLM
-- [ ] 4.2a Probe the gateway-to-backend link by sending a request through LiteLLM with a deliberately invalid token, verifying Modal returns an authentication rejection at its edge with no container start and no GPU charge — this settles whether credentials reach the backend at zero cost, before any real spend
-- [ ] 4.3 Disable LiteLLM background health checks globally, disable them for this model specifically, and exclude the model from on-demand health probes — all three settings, because one is known to be insufficient — verifying each appears in the config
-- [ ] 4.4 Set the LiteLLM request timeout above the cold start duration measured in 3.10, and cap retries for this model at no more than one, verifying both against the recorded cold start figure
-- [ ] 4.5 Call the model through LiteLLM with a gateway-issued key and verify the response matches what the direct endpoint returns
-- [ ] 4.6 Request a streamed completion through LiteLLM and verify tokens arrive incrementally at the client
-- [ ] 4.7 Issue a request with an invalid gateway key and verify LiteLLM rejects it without forwarding to the backend and without starting a container
+- [x] 4.2 Add the model to the LiteLLM config as an OpenAI-compatible provider pointing at the Modal endpoint, with `api_key` set to the combined Modal bearer token sourced from an environment variable rather than a literal — Modal accepts the token pair as a standard `Authorization: Bearer wk-....ws-...` header, so no custom-header support is required from LiteLLM
+- [x] 4.2a Probe the gateway-to-backend link by sending a request through LiteLLM with a deliberately invalid token, verifying Modal returns an authentication rejection at its edge with no container start and no GPU charge — this settles whether credentials reach the backend at zero cost, before any real spend
+- [x] 4.3 Disable LiteLLM background health checks globally, disable them for this model specifically, and exclude the model from on-demand health probes — all three settings, because one is known to be insufficient — verifying each appears in the config
+- [x] 4.4 Set the LiteLLM request timeout above the cold start duration measured in 3.10, and cap retries for this model at no more than one, verifying both against the recorded cold start figure
+- [x] 4.5 Call the model through LiteLLM with a gateway-issued key and verify the response matches what the direct endpoint returns
+- [x] 4.6 Request a streamed completion through LiteLLM and verify tokens arrive incrementally at the client
+- [x] 4.7 Issue a request with an invalid gateway key and verify LiteLLM rejects it without forwarding to the backend and without starting a container
 - [ ] 4.8 **Leave the gateway running overnight with no user activity, then verify from the Modal billing dashboard that zero GPU cost accrued** — this confirms polling suppression empirically, which configuration inspection alone cannot do
 - [ ] 4.9 If 4.8 shows any overnight cost, identify the polling source from Modal's container start logs and suppress it, repeating the overnight check until cost is zero before proceeding
 - [ ] 4.9a If the polling source cannot be traced after 4.9, adopt `modal app stop` between sessions as the fallback control and record in `NOTES.md` that the overnight check was never passed, verifying the team is told the endpoint must be redeployed before use
@@ -56,7 +56,7 @@
 - [ ] 5.1 Check the remaining Modal balance and record it in `NOTES.md`, confirming at least 7 GPU-hours remain for the trial
 - [ ] 5.2 Assemble a fixed evaluation set of 20-50 representative English tasks drawn from real company work, saved to `eval/tasks.md`, verifying each entry is a concrete task rather than a generic prompt
 - [ ] 5.3 Run the evaluation set against the deployment and retain all outputs under `eval/baseline/`, verifying the run is reproducible and the outputs are complete
-- [ ] 5.4 Measure warm-request time to first token and sustained output tokens per second, recording both in `NOTES.md` and verifying the figures come from timed requests rather than theoretical bandwidth calculations
+- [x] 5.4 Measure warm-request time to first token and sustained output tokens per second, recording both in `NOTES.md` and verifying the figures come from timed requests rather than theoretical bandwidth calculations
 - [ ] 5.5 Distribute per-user keys to the pilot team with brief usage instructions, verifying at least one user outside the implementer successfully completes a request
 - [ ] 5.6 Run the team pilot across two to three working weeks, checking the Modal balance at the start of each day and recording it in `NOTES.md`
 - [ ] 5.7 Export the LiteLLM request log for the pilot period, verifying it contains per-request user identity, timestamp, and input and output token counts
