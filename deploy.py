@@ -108,6 +108,32 @@ VLLM_VERSION = "0.17.0"
 CPU_CORES = 4
 MEMORY_MB = 32 * 1024
 
+# ---------------------------------------------------------------------------
+# GPU memory snapshots were TRIED AND REVERTED on 2026-09-24. Do not retry
+# without new evidence that Modal's implementation has changed.
+#
+# The idea was sound: of a 319 s cold start, vLLM reported that 220.92 s was
+# "init engine (profile, create kv cache, warmup model)", which a snapshot
+# should skip entirely. Implementing it required restructuring this file into
+# a class with @modal.enter(snap=True/False) hooks, vLLM sleep mode, and
+# raising memory to 64 GiB so level-1 sleep could offload 28.9 GiB of weights
+# to CPU RAM.
+#
+# Five measured cold starts with snapshots enabled:
+#     743 s, 580 s, 41 s, 784 s, 522 s     (median 580 s, mean 534 s)
+# against a measured baseline of 319 s without them.
+#
+# One restore was genuinely fast (41 s, weights and KV cache woke in 3.6 s).
+# The rest re-created the snapshot instead of restoring it, which costs more
+# than a plain cold start. Modal's published 10x figure is for a 3B model;
+# at 28.9 GiB the snapshot does not reliably stabilise, and the worst case
+# (784 s) is far worse than the predictable 319 s it replaced.
+#
+# Unpredictable 41 s-to-13 min is worse for users than a reliable ~5 min, so
+# the simpler function-based deployment below was restored. Cost of finding
+# out: about $3.90.
+# ---------------------------------------------------------------------------
+
 # Volume mount points inside the container.
 HF_CACHE_PATH = "/cache/huggingface"
 VLLM_CACHE_PATH = "/cache/vllm"
