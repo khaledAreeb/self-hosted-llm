@@ -1,0 +1,36 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Secrets and credentials -- Modal proxy auth tokens, HF tokens, LiteLLM keys
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.yaml
+secrets.yml
+
+# Modal local state
+.modal/
+.modal.toml
+
+# Model weights -- these live in Modal Volumes and on Hugging Face, never in git
+*.safetensors
+*.gguf
+*.bin
+models/
+
+# Editor and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
