@@ -61,6 +61,22 @@ MAX_MODEL_LEN = 32_768
 # Halves KV cache bytes per token (~64 KB -> ~32 KB at this model's shape).
 KV_CACHE_DTYPE = "fp8"
 
+# Turn OFF the model's chain-of-thought by default.
+#
+# This model ships with "xhigh" reasoning effort. Measured behaviour before
+# this setting: a request for a 400-word explanation with max_tokens=800
+# produced 800 reasoning tokens and ZERO visible content -- `content` came back
+# as None with finish_reason="length". The model never began its answer. A
+# streamed 150-word request behaved identically: 400 reasoning chunks, 0
+# content chunks.
+#
+# Callers who genuinely want reasoning send it per request:
+#     {"chat_template_kwargs": {"enable_thinking": true}}
+# Request-level kwargs always take priority over this server default.
+#
+# Middle ground if reasoning is wanted but cheaper: '{"reasoning_effort": "low"}'.
+CHAT_TEMPLATE_KWARGS = '{"enable_thinking": false}'
+
 GPU_MEMORY_UTILIZATION = 0.90
 
 # Release the GPU after 5 minutes idle.
@@ -211,10 +227,18 @@ def serve():
         "--gpu-memory-utilization",
         str(GPU_MEMORY_UTILIZATION),
         # Separates the model's thinking from its answer in the API response.
-        # From vLLM's published recipe for this model. If startup fails on an
-        # unrecognized flag, this is the one to drop first.
+        # From vLLM's published recipe for this model. Keep this even with
+        # thinking disabled: it is what made the empty-answer failure visible
+        # as empty `content` rather than as rambling answers.
         "--reasoning-parser",
         "qwen3",
+        # Server-wide default for chat template kwargs. Set here rather than in
+        # LiteLLM because chat_template_kwargs is a vLLM extension, not part of
+        # the OpenAI spec -- routing it through a proxy means trusting that
+        # proxy to forward a non-standard field. Setting it at the source also
+        # covers callers that bypass the gateway.
+        "--default-chat-template-kwargs",
+        CHAT_TEMPLATE_KWARGS,
     ]
     print("starting:", " ".join(cmd))
     subprocess.Popen(cmd)
