@@ -6,38 +6,39 @@
 
 ## 1. Account prerequisites and budget baseline
 
-- [ ] 1.1 Install the Modal CLI into the project venv and authenticate, verifying with `modal profile current` that it reports the intended workspace
-- [ ] 1.2 Record the starting Modal credit balance from the billing dashboard into `NOTES.md`, verifying the figure matches the expected $30 starting point
-- [ ] 1.3 Create a Modal proxy auth token pair at the proxy-auth-tokens settings page and store the ID and secret in a Modal Secret, verifying with `modal secret list` that the secret exists and that neither value appears in any file in the project directory
-- [ ] 1.4 Confirm `Qwen/Qwen3.8-27B-FP8` is publicly downloadable without a gated-repo acceptance step, verifying by fetching the repo's config file metadata from Hugging Face without credentials
+- [x] 1.1 Install the Modal CLI into the project venv and authenticate, verifying with `modal profile current` that it reports the intended workspace
+- [x] 1.2 Record the starting Modal credit balance from the billing dashboard into `NOTES.md`, verifying the figure matches the expected $30 starting point
+- [x] 1.3 Create a Modal proxy auth token pair (dashboard, or `modal workspace proxy-tokens create <name>`) and store it as the combined bearer form `wk-....ws-...` in a gitignored `.env` locally, and as an environment variable on the LiteLLM host — **not** in a Modal Secret, because Modal validates proxy tokens at its own edge and the container never sees them — verifying with `git check-ignore .env` that the file is ignored and that the secret appears in no tracked file
+- [x] 1.4 Confirm `Qwen/Qwen3.8-27B-FP8` is publicly downloadable without a gated-repo acceptance step, verifying by fetching the repo's config file metadata from Hugging Face without credentials
 
 ## 2. Model weight caching
 
-- [ ] 2.1 Write `deploy.py` with constants at the top (model ID, GPU type, idle window, context bound) and a Modal image definition installing vLLM >= 0.17.0, verifying with `python -c "import ast; ast.parse(open('deploy.py').read())"` that the file parses
-- [ ] 2.2 Add two Modal Volumes to `deploy.py` — one for Hugging Face weights, one for vLLM compilation artifacts — verifying with `modal volume list` that both exist after first use
-- [ ] 2.3 Add a one-time `download()` function that fetches the FP8 checkpoint into the weights volume, keeping it separate from the serving path so cold starts never re-download, verifying the function is decorated to run standalone
-- [ ] 2.4 Run the download once and verify with `modal volume ls` that roughly 28 GB of weight files are present in the volume
-- [ ] 2.5 Record the download step's actual cost in `NOTES.md`, verifying it against the Modal billing dashboard rather than estimating
+- [x] 2.1 Write `deploy.py` with constants at the top (model ID, GPU type, idle window, context bound) and a Modal image definition installing vLLM >= 0.17.0, verifying with `python -c "import ast; ast.parse(open('deploy.py').read())"` that the file parses
+- [x] 2.2 Add two Modal Volumes to `deploy.py` — one for Hugging Face weights, one for vLLM compilation artifacts — verifying with `modal volume list` that both exist after first use
+- [x] 2.3 Add a one-time `download()` function that fetches the FP8 checkpoint into the weights volume, keeping it separate from the serving path so cold starts never re-download, verifying the function is decorated to run standalone
+- [x] 2.4 Run the download once and verify with `modal volume ls` that roughly 28 GB of weight files are present in the volume
+- [x] 2.5 Record the download step's actual cost in `NOTES.md`, verifying it against the Modal billing dashboard rather than estimating
 
 ## 3. Serving endpoint
 
-- [ ] 3.1 Check the remaining Modal balance before starting this group and record it in `NOTES.md`, halting if under $25
-- [ ] 3.2 Add the serving class to `deploy.py` that launches `vllm serve` as a subprocess against the cached weights and exposes its port as a web server, using the subprocess rather than vLLM's Python `LLM` class so the OpenAI-compatible API comes for free
-- [ ] 3.3 Set the serving configuration to A100-40GB, an explicit context bound near 32K, an FP8 KV cache, a 300-second idle window, and a startup allowance of at least 10 minutes, verifying each value is a named constant at the top of the file rather than inline
-- [ ] 3.4 Enable Modal proxy auth on the web endpoint so unauthorized requests are rejected at the edge, verifying the deploy output marks the URL as protected
-- [ ] 3.5 Deploy and smoke-test with an authenticated chat completion request, verifying a coherent English response comes back and confirming the Ampere FP8-Marlin path works with this model's DeltaNet layers
-- [ ] 3.6 If 3.5 fails to load or produces incoherent output, switch the GPU constant to L40S and re-run the smoke test, verifying the vLLM published recipe path works and recording the reason for the switch in `NOTES.md`
-- [ ] 3.7 Send an unauthenticated request to the endpoint URL and verify from the Modal dashboard that it was rejected with no container start and no GPU charge
-- [ ] 3.8 Request a completion with streaming enabled and verify tokens arrive incrementally rather than as one final block
-- [ ] 3.9 Request a completion exceeding the configured context bound and verify a clear context-length error is returned rather than an out-of-memory crash
-- [ ] 3.10 Measure and record the unoptimized cold start duration in `NOTES.md` as the baseline for any later optimization, verifying by timing a request issued after the container has scaled to zero
-- [ ] 3.11 Wait past the idle window with no requests and verify from the Modal dashboard that the container scaled to zero and GPU billing stopped
-- [ ] 3.12 Write a short `README.md` covering how to download weights, deploy, and call the endpoint, verifying each documented command runs as written
+- [x] 3.1 Check the remaining Modal balance before starting this group and record it in `NOTES.md`, halting if under $25
+- [x] 3.2 Add the serving class to `deploy.py` that launches `vllm serve` as a subprocess against the cached weights and exposes its port as a web server, using the subprocess rather than vLLM's Python `LLM` class so the OpenAI-compatible API comes for free
+- [x] 3.3 Set the serving configuration to A100-40GB, an explicit context bound near 32K, an FP8 KV cache, a 300-second idle window, and a startup allowance of at least 10 minutes, verifying each value is a named constant at the top of the file rather than inline
+- [x] 3.4 Enable Modal proxy auth on the web endpoint so unauthorized requests are rejected at the edge, verifying the deploy output marks the URL as protected
+- [x] 3.5 Deploy and smoke-test with an authenticated chat completion request, verifying a coherent English response comes back and confirming the Ampere FP8-Marlin path works with this model's DeltaNet layers
+- [x] 3.6 If 3.5 fails to load or produces incoherent output, switch the GPU constant and re-run the smoke test, recording the reason for the switch in `NOTES.md` — **fired 2026-09-24, but not for the anticipated reason.** FP8-Marlin on Ampere worked; the failure was CUDA OOM during KV cache profiling. Switched to **A100-80GB** rather than the pre-selected L40S, because L40S offered only ~0.8 GiB of margin against the measured 42.4 GiB requirement while A100-80GB offers ~29.6 GiB and ~2x the memory bandwidth
+- [x] 3.7 Send an unauthenticated request to the endpoint URL and verify from the Modal dashboard that it was rejected with no container start and no GPU charge
+- [x] 3.8 Request a completion with streaming enabled and verify tokens arrive incrementally rather than as one final block
+- [x] 3.9 Request a completion exceeding the configured context bound and verify a clear context-length error is returned rather than an out-of-memory crash
+- [x] 3.10 Measure and record the unoptimized cold start duration in `NOTES.md` as the baseline for any later optimization, verifying by timing a request issued after the container has scaled to zero
+- [x] 3.11 Wait past the idle window with no requests and verify from the Modal dashboard that the container scaled to zero and GPU billing stopped
+- [x] 3.12 Write a short `README.md` covering how to download weights, deploy, and call the endpoint, verifying each documented command runs as written
 
 ## 4. Gateway integration
 
 - [ ] 4.1 Check the remaining Modal balance and record it in `NOTES.md` before starting this group
-- [ ] 4.2 Add the model to the LiteLLM config as an OpenAI-compatible provider pointing at the Modal endpoint, with the Modal auth headers supplied via `extra_headers` sourced from environment variables rather than literals in the config file
+- [ ] 4.2 Add the model to the LiteLLM config as an OpenAI-compatible provider pointing at the Modal endpoint, with `api_key` set to the combined Modal bearer token sourced from an environment variable rather than a literal — Modal accepts the token pair as a standard `Authorization: Bearer wk-....ws-...` header, so no custom-header support is required from LiteLLM
+- [ ] 4.2a Probe the gateway-to-backend link by sending a request through LiteLLM with a deliberately invalid token, verifying Modal returns an authentication rejection at its edge with no container start and no GPU charge — this settles whether credentials reach the backend at zero cost, before any real spend
 - [ ] 4.3 Disable LiteLLM background health checks globally, disable them for this model specifically, and exclude the model from on-demand health probes — all three settings, because one is known to be insufficient — verifying each appears in the config
 - [ ] 4.4 Set the LiteLLM request timeout above the cold start duration measured in 3.10, and cap retries for this model at no more than one, verifying both against the recorded cold start figure
 - [ ] 4.5 Call the model through LiteLLM with a gateway-issued key and verify the response matches what the direct endpoint returns
