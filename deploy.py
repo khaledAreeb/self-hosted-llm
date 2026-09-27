@@ -56,10 +56,32 @@ GPU = "A100-80GB"
 # cache for all of it and strangles the GPU. 32K leaves ~9 GB of headroom on
 # a 40 GB card -- roughly 160,000 tokens of KV budget, which is far more
 # concurrent context than a small pilot team will use.
-MAX_MODEL_LEN = 131_072
+# Just inside the 262,144 native limit, so no YaRN rope scaling is needed.
+# Going past native would change the model's behaviour and confound a
+# capability evaluation: a weak answer could be the model or the scaling,
+# with no way to tell which.
+#
+# At 250K with a BF16 KV cache one full-length sequence needs 15.26 GiB
+# against a ~43 GiB pool -- about 2.8 concurrent at full length. Ample for
+# evaluation, too few for serving a team. Revisit before multi-user use.
+MAX_MODEL_LEN = 250_000
 
-# Halves KV cache bytes per token (~64 KB -> ~32 KB at this model's shape).
-KV_CACHE_DTYPE = "fp8"
+# BF16 rather than FP8, deliberately, for this evaluation phase.
+#
+# FP8 halves KV bytes per token (64 KB -> 32 KB at this model's shape) and is
+# the right choice for throughput. But a community benchmark on this model
+# measured KV precision at 256K context: BF16 scored 0.833, FP8 scored 0.717.
+# At 32K that gap does not appear; at 250K it is exactly the regime in use.
+#
+# Evaluating long-document capability on the weaker cache risks the worst kind
+# of wrong conclusion -- deciding the MODEL is poor at long context when the
+# SETTING was. Since the point of this phase is judging the model, it runs on
+# the configuration that handicaps it least.
+#
+# The cost is real: concurrency at full length halves, ~5.6 -> ~2.8 sequences.
+# Wrong trade for serving thirty people, right trade for judging quality.
+# Switch back to "fp8" before multi-user serving.
+KV_CACHE_DTYPE = "bf16"
 
 # Turn OFF the model's chain-of-thought by default.
 #

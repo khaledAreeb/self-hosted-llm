@@ -1,6 +1,8 @@
 # Tasks
 
-> **Spend ceiling: $8** of the ~$21 remaining. Check the balance before each group. When the ceiling is reached, write findings from what has been gathered rather than continuing.
+> **Spend ceiling: $12** of the $16.15 remaining (verified 2026-09-27). Check the balance before each group. When the ceiling is reached, write findings from what has been gathered rather than continuing.
+>
+> The ceiling was raised from $8 after the real balance turned out lower than planned. The original $30 can no longer fund both this evaluation and the cost pilot (~$20.60), so this phase takes priority: if the model is not good enough, its cost does not matter, and quality evidence is what justifies asking for more budget.
 
 > **Cold starts are longer at 250K** — more KV cache is reserved at startup. Every configuration change forces a fresh one, so batch evaluation into as few warm windows as possible.
 
@@ -10,8 +12,8 @@
 
 ## 1. Prove the memory fits, before anything depends on it
 
-- [ ] 1.1 Record the current Modal balance in `NOTES.md` as the baseline for this change's $8 ceiling, halting if under $10
-- [ ] 1.2 Set `MAX_MODEL_LEN = 250_000` and `KV_CACHE_DTYPE = "bf16"` as named constants in `deploy.py`, verifying the file parses and both values appear in the built serve command
+- [x] 1.1 Record the current Modal balance in `NOTES.md` as the baseline for this change's $8 ceiling, halting if under $10
+- [x] 1.2 Set `MAX_MODEL_LEN = 250_000` and `KV_CACHE_DTYPE = "bf16"` as named constants in `deploy.py`, verifying the file parses and both values appear in the built serve command
 - [ ] 1.3 Redeploy and trigger one cold start, verifying the server reaches a serving state and does **not** fail with CUDA out-of-memory during KV cache allocation — this is the failure that killed the A100-40GB and the arithmetic alone cannot rule it out
 - [ ] 1.4 Capture the full startup log to `eval/startup-250k.log` and record in `NOTES.md` the reported KV cache size, the init-engine duration, and the total cold start time at this context length
 - [ ] 1.5 If 1.3 failed with OOM, reduce `MAX_MODEL_LEN` to 200_000 and retry; if it still fails, revert `KV_CACHE_DTYPE` to `"fp8"` and record that BF16 at long context was not affordable on this GPU
@@ -25,7 +27,7 @@
 
 ## 3. Speculative decoding
 
-- [ ] 3.1 Check the remaining balance and record it, skipping this group if under $4
+- [ ] 3.1 Check the remaining balance and record it, skipping this group if under $6
 - [ ] 3.2 Add `--speculative-config '{"method":"mtp","num_speculative_tokens":3}'` as a named constant, redeploy, and verify from the startup log that speculative decoding is active rather than silently ignored
 - [ ] 3.3 Record the observed acceptance rate from the server's metrics alongside the published 0.771 figure for this checkpoint
 - [ ] 3.4 Measure tokens per second on a warm container and compare against the 44.5 tok/s recorded before this change, using a comparable prompt
@@ -43,7 +45,7 @@
 
 ## 5. Run the evaluation
 
-- [ ] 5.1 Check the remaining balance and record it, halting if under $3
+- [ ] 5.1 Check the remaining balance and record it, halting if under $4
 - [ ] 5.2 Run the full set against the deployment in as few warm windows as possible, saving every output under `eval/results/2026-09-27/` alongside the exact serving flags that produced them
 - [ ] 5.3 Record per-task latency and token counts, verifying the long-document and vision tasks are reported separately since their cost profiles differ sharply from short prompts
 - [ ] 5.4 Note any task where the model failed, refused, truncated, or produced an empty answer, verifying each is reproducible rather than a one-off
@@ -55,7 +57,7 @@
 - [ ] 6.3 State plainly whether vision works well enough to rely on, since it is the other reason and no other model in the fleet offers it
 - [ ] 6.4 Compare against the hosted OpenRouter models already in use for any task where both could plausibly be used, verifying the comparison names which is better and why
 - [ ] 6.5 Record the final serving configuration with a comment above each flag explaining why it is set that way, especially the BF16 KV cache and its concurrency cost, so whoever later optimises for throughput knows it was a deliberate trade
-- [ ] 6.6 Record total spend against the $8 ceiling, verified from the Modal dashboard
+- [ ] 6.6 Record total spend against the $12 ceiling, verified from the Modal dashboard
 
 ## 7. Final verification
 
