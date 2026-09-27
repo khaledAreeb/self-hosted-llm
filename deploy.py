@@ -56,7 +56,7 @@ GPU = "A100-80GB"
 # cache for all of it and strangles the GPU. 32K leaves ~9 GB of headroom on
 # a 40 GB card -- roughly 160,000 tokens of KV budget, which is far more
 # concurrent context than a small pilot team will use.
-MAX_MODEL_LEN = 32_768
+MAX_MODEL_LEN = 131_072
 
 # Halves KV cache bytes per token (~64 KB -> ~32 KB at this model's shape).
 KV_CACHE_DTYPE = "fp8"
@@ -74,8 +74,37 @@ KV_CACHE_DTYPE = "fp8"
 #     {"chat_template_kwargs": {"enable_thinking": true}}
 # Request-level kwargs always take priority over this server default.
 #
-# Middle ground if reasoning is wanted but cheaper: '{"reasoning_effort": "low"}'.
-CHAT_TEMPLATE_KWARGS = '{"enable_thinking": false}'
+# Currently set to MEDIUM reasoning effort: thinking is on, but on a far
+# smaller budget than the shipped default.
+#
+# Other values:
+#   '{"enable_thinking": false}'        no reasoning at all, fastest
+#   '{"reasoning_effort": "low"}'       minimal reasoning
+#   '{"reasoning_effort": "medium"}'    current
+#   (unset)                             "xhigh" -- the shipped default, which
+#                                       measured 800 reasoning tokens and ZERO
+#                                       visible content on a 400-word request
+#
+# With thinking on, callers must allow enough max_tokens for the reasoning
+# AND the answer. Too small a budget and the model spends it all thinking,
+# returning content: None with finish_reason "length".
+CHAT_TEMPLATE_KWARGS = '{"reasoning_effort": "medium"}'
+
+# Tool / function calling. Required by any agent-style client (GitHub Copilot's
+# Agent mode, LangChain, etc.) -- they send tool definitions with
+# tool_choice="auto", and without a parser vLLM rejects the request outright:
+#     "auto" tool choice requires --enable-auto-tool-choice
+#     and --tool-call-parser to be set
+#
+# The model is capable (81.27 on BFCL, a tool-calling benchmark); what was
+# missing is the parser that turns its output into structured `tool_calls`.
+# `qwen3_xml` is the value vLLM's published recipe for this model specifies.
+#
+# Caveat worth knowing: there are open vLLM issues where the qwen3 family of
+# parsers mis-handles `tool_choice: "required"` and named-function choices.
+# `auto` is the path that is actually exercised, so test any client that
+# depends on the others.
+TOOL_CALL_PARSER = "qwen3_xml"
 
 GPU_MEMORY_UTILIZATION = 0.90
 
@@ -86,7 +115,7 @@ GPU_MEMORY_UTILIZATION = 0.90
 #
 # Do NOT drop below ~2 minutes: a user who pauses 90 seconds to read an answer
 # would otherwise trigger a cold start in the middle of their conversation.
-IDLE_WINDOW_SECONDS = 5 * 60
+IDLE_WINDOW_SECONDS = 10 * 60
 
 # A 28 GB model takes minutes to load. Modal's default startup_timeout is 5
 # SECONDS, which would kill the container while it is starting normally.
@@ -265,6 +294,10 @@ def serve():
         # covers callers that bypass the gateway.
         "--default-chat-template-kwargs",
         CHAT_TEMPLATE_KWARGS,
+        # Lets clients send tool definitions and get structured tool_calls back.
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        TOOL_CALL_PARSER,
     ]
     print("starting:", " ".join(cmd))
     subprocess.Popen(cmd)
