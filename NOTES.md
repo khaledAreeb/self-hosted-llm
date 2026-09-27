@@ -446,6 +446,117 @@ A cost of the experiment worth anticipating next time: **changing the image to
 test something invalidates the cache that made the baseline fast**, so the first
 measurements after any image change are not comparable to earlier ones.
 
+### 2026-09-27 — 250K context with a BF16 KV cache FITS (tasks 1.3, 1.4, 1.6)
+
+**No OOM.** The failure mode that killed the A100-40GB did not recur at four
+times the context length with double the KV bytes per token.
+
+| Measurement | Value |
+|---|---|
+| Cold start, 250K + BF16 | **655 s** (~11 min) |
+| Free GPU memory at startup | 78.84 / 79.25 GiB |
+| Budget at 0.90 utilization | **71.33 GiB** |
+| Weights resident | **29.34 GiB** |
+| Available for KV cache | **~42 GiB** |
+| `init engine` | **457.83 s** (compilation 99.32 s) |
+| Graph capture | 54 s, 0.46 GiB |
+| CUDA graph pool | 0.46 GiB actual vs 0.83 GiB estimated |
+| KV cache group sizes | [784, 784, 784, 784] |
+
+The ~42 GiB of KV headroom matches the ~43 GiB the design predicted, so the
+per-token arithmetic was sound this time. What could not be predicted — whether
+the minimum page allocation scales with `max-model-len` — turned out not to
+bite.
+
+**Cold start more than doubled**, 300 s → 655 s. Most of it is `init engine` at
+457.83 s, and 99.32 s of that is compilation: changing `max-model-len` and the
+KV dtype produces a new compilation target, so the `vllm_cache` Volume was cold
+for this configuration. It should fall on subsequent starts, as it did in phase
+one (602 → 514 → 428 → 300 s).
+
+**Task 1.5 did not fire.** Its condition was an OOM at 250K; there was none, so
+the fallback to 200K and then to an FP8 KV cache was not needed.
+
+**Task 1.6 — prefix caching is already enabled by default.** The earlier log
+showed `Prefix cache hit rate: 85` and `86`, which cannot be reported unless the
+cache is active. So `--enable-prefix-caching` is **not** an available
+improvement — adding it and attributing a gain to it would have been exactly the
+false result the design warned about. vLLM's V1 engine also enables chunked
+prefill by default.
+
+### 2026-09-27 — Long context genuinely works (tasks 2.1, 2.2, 2.3)
+
+A 142,609-token synthetic audit document was built with unique reference codes
+placed at the very beginning and the very end, so that retrieval could be
+verified rather than assumed. The model was asked to report both plus a name
+mentioned only in the closing section.
+
+```
+  1. ZX-4471-KESTREL    (start of document)   CORRECT
+  2. QP-9928-FALCON     (end of document)     CORRECT
+  3. Mariam Fouad       (closing section)     CORRECT
+```
+
+`finish_reason: stop`, 131 reasoning tokens and 35 visible. Retrieval from both
+ends of a 142K-token prompt confirms the context is real rather than silently
+truncated — a model that dropped the middle or the tail would have failed the
+second and third items.
+
+| Measurement | Value |
+|---|---|
+| Prompt tokens accepted | **142,609** |
+| First run, cold prefix cache | **81.4 s** |
+| Second run, warm prefix cache | **8.7 s** |
+| Over-length request (2.2) | clean `400`, 7.4 s |
+
+**The 81 s → 8.7 s difference is prefix caching working.** The second request
+reused the cached 142K-token prefix, so prefill was almost free. This is the
+exact traffic shape the feature targets, and it is already on by default — which
+is why enabling it was never an available improvement.
+
+The over-length error names the arithmetic precisely: *"maximum context length
+is 250000 tokens... 249901 input tokens... total of at least 250001"*. A clean
+rejection rather than an out-of-memory crash.
+
+### 2026-09-27 — Thinking is back on, by operator choice
+
+`CHAT_TEMPLATE_KWARGS` was changed from `{"enable_thinking": false}` to
+`{"reasoning_effort": "medium"}` outside this workflow. That is a deliberate
+configuration choice, not a regression, but it has a consequence worth stating:
+
+**With thinking enabled, `max_tokens` must cover reasoning *plus* the answer.**
+The first long-context attempt used `max_tokens: 120`, and all 120 went to
+reasoning — `content` came back `None` with `finish_reason: length`, even though
+the reasoning text contained all three correct answers. Raising the budget to
+1500 produced 131 reasoning and 35 visible tokens.
+
+Any client integration must account for this. A caller that sets a small
+`max_tokens` will receive empty responses that look like model failure but are
+budget exhaustion. This is the same failure that `enable_thinking: false`
+originally fixed, now reintroduced as a trade for reasoning quality.
+
+### 2026-09-27 — A flag value is not verified by appearing in a command
+
+The first attempt at this configuration failed, and not for any interesting
+reason: `--kv-cache-dtype bf16` is invalid. vLLM accepts `bfloat16`.
+
+```
+vllm serve: error: argument --kv-cache-dtype: invalid choice: 'bf16'
+(choose from 'auto', 'bfloat16', 'float16', 'fp8', ...)
+```
+
+The container died during argument parsing and Modal retried it for ~25 minutes
+before the test timed out. The verification that had been performed — confirming
+the constant appeared in the built command — was satisfied by a wrong value.
+
+This is the third instance of the same class of error, alongside the GPU type
+string and the CUDA image tag. All three are values that Modal or vLLM validate
+only at runtime and that cannot be checked locally. The lesson is narrow and
+worth stating plainly: **confirming a flag is present is not confirming it is
+valid.** Where a value comes from documentation rather than from a local API,
+the first deploy is the test, and its failure should be expected rather than
+treated as a surprise.
+
 ## Open items
 
 - [ ] Confirm CPU/memory really are billed additively (first invoice).

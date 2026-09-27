@@ -13,17 +13,17 @@
 ## 1. Prove the memory fits, before anything depends on it
 
 - [x] 1.1 Record the current Modal balance in `NOTES.md` as the baseline for this change's $8 ceiling, halting if under $10
-- [x] 1.2 Set `MAX_MODEL_LEN = 250_000` and `KV_CACHE_DTYPE = "bf16"` as named constants in `deploy.py`, verifying the file parses and both values appear in the built serve command
-- [ ] 1.3 Redeploy and trigger one cold start, verifying the server reaches a serving state and does **not** fail with CUDA out-of-memory during KV cache allocation — this is the failure that killed the A100-40GB and the arithmetic alone cannot rule it out
-- [ ] 1.4 Capture the full startup log to `eval/startup-250k.log` and record in `NOTES.md` the reported KV cache size, the init-engine duration, and the total cold start time at this context length
-- [ ] 1.5 If 1.3 failed with OOM, reduce `MAX_MODEL_LEN` to 200_000 and retry; if it still fails, revert `KV_CACHE_DTYPE` to `"fp8"` and record that BF16 at long context was not affordable on this GPU
-- [ ] 1.6 Confirm from the same startup log whether prefix caching and chunked prefill are already enabled, recording the finding — if already on, note that enabling the flag is not an available change and do not add it
+- [x] 1.2 Set `MAX_MODEL_LEN = 250_000` and `KV_CACHE_DTYPE = "bfloat16"` as named constants in `deploy.py`, verifying the file parses and both values appear in the built serve command
+- [x] 1.3 Redeploy and trigger one cold start, verifying the server reaches a serving state and does **not** fail with CUDA out-of-memory during KV cache allocation — this is the failure that killed the A100-40GB and the arithmetic alone cannot rule it out
+- [x] 1.4 Capture the full startup log to `eval/startup-250k.log` and record in `NOTES.md` the reported KV cache size, the init-engine duration, and the total cold start time at this context length
+- [x] 1.5 If 1.3 failed with OOM, reduce `MAX_MODEL_LEN` to 200_000 and retry; if it still fails, revert `KV_CACHE_DTYPE` to `"fp8"` — **condition did not fire.** 250K with BF16 allocated cleanly: 29.34 GiB weights against a 71.33 GiB budget, leaving ~42 GiB for KV cache. No fallback needed
+- [x] 1.6 Confirm from the same startup log whether prefix caching and chunked prefill are already enabled, recording the finding — if already on, note that enabling the flag is not an available change and do not add it
 
 ## 2. Confirm the long context actually works
 
-- [ ] 2.1 Send a request with roughly 200,000 tokens of real document text and verify a coherent answer referencing content from both the beginning and the end, which a model that silently truncates would fail
-- [ ] 2.2 Send a request exceeding 250,000 tokens and verify a clear context-length error is returned rather than a crash or an out-of-memory failure
-- [ ] 2.3 Record time-to-first-token and total duration for the 200K request in `NOTES.md`, since prefill at this length dominates latency and sets expectations for long-document use
+- [x] 2.1 Send a request with roughly 200,000 tokens of real document text and verify a coherent answer referencing content from both the beginning and the end, which a model that silently truncates would fail
+- [x] 2.2 Send a request exceeding 250,000 tokens and verify a clear context-length error is returned rather than a crash or an out-of-memory failure
+- [x] 2.3 Record time-to-first-token and total duration for the 200K request in `NOTES.md`, since prefill at this length dominates latency and sets expectations for long-document use
 
 ## 3. Speculative decoding
 

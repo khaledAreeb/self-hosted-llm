@@ -81,7 +81,7 @@ MAX_MODEL_LEN = 250_000
 # The cost is real: concurrency at full length halves, ~5.6 -> ~2.8 sequences.
 # Wrong trade for serving thirty people, right trade for judging quality.
 # Switch back to "fp8" before multi-user serving.
-KV_CACHE_DTYPE = "bf16"
+KV_CACHE_DTYPE = "bfloat16"
 
 # Turn OFF the model's chain-of-thought by default.
 #
