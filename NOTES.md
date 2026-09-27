@@ -25,6 +25,23 @@ the first real invoice.
 | 2026-09-24 | Image build + first download attempt (CPU only, ~90s) | **$0.03** | $29.97 | Modal dashboard |
 | 2026-09-24 | Group 3 balance check (task 3.1), above the $25 halt threshold | — | $29.97 | Modal dashboard |
 | 2026-09-24 | Stage 1 + gateway verification complete (tasks 4.1, 5.1) | **$2.58 cumulative** | **$27.42** | Modal dashboard |
+| 2026-09-25 | Phase 1 close: snapshot experiment, Copilot/OpenCode integration, agent-load testing | **$13.85 cumulative** | **$16.15** | Modal dashboard |
+| 2026-09-27 | **Phase 2 baseline** (task 1.1) — capability evaluation begins | — | **$16.15** | Modal dashboard |
+
+**Phase 2 budget reality.** $16.15 remains against an original $30. The cost
+pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
+original budget can no longer fund both this evaluation and the pilot**.
+
+Capability evaluation takes priority, with the ceiling raised from $8 to $12.
+The reasoning is ordering rather than preference: if the model is not good
+enough, its running cost is irrelevant, and quality evidence is what justifies
+requesting more budget. A cost forecast for a model nobody has judged persuades
+no one.
+
+Where the $13.85 went: cold starts dominate. Roughly $3.90 on the GPU memory
+snapshot experiment that was measured and reverted, and most of the rest on
+cold starts triggered while debugging the Copilot and OpenCode integrations —
+each failed attempt woke the GPU.
 
 **Spend to date: $2.58 of $30.00.** At ~$2.94/hr effective on A100-80GB that
 leaves roughly **9.3 GPU-hours**, comfortably above the 7-hour floor task 5.1
