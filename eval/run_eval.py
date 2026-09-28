@@ -5,6 +5,7 @@ Run the evaluation set in eval/tasks.md against the deployed endpoint.
     python3 eval/run_eval.py                  # every task
     python3 eval/run_eval.py code-1 vision-2  # only these tasks
     python3 eval/run_eval.py --effort medium code-1   # re-run with more thinking
+    python3 eval/run_eval.py --effort medium --max-tokens-scale 4
 
 Tasks run one at a time so each latency is measured without interference.
 Results go to eval/results/<today>/:
@@ -16,7 +17,9 @@ Results go to eval/results/<today>/:
 
 Re-running a subset on the same day overwrites those tasks and keeps the rest.
 With --effort, results are saved as <task-id>@<effort> so they sit beside the
-default-effort result instead of replacing it.
+default-effort result instead of replacing it. Higher effort spends far more
+tokens thinking (measured: 88% at medium), so --max-tokens-scale multiplies
+every task's max_tokens to leave room for the answer.
 
 Refuses to run a task that is still a FORMAT EXAMPLE, has no "good answer"
 written, or points at an attachment that does not exist -- the criteria must
@@ -53,9 +56,9 @@ def section(block, name):
 
 
 def parse_tasks():
+    # Only a "## TASK:" at the very start of a line counts, so the indented
+    # example in the Format section is not parsed as a task.
     text = open(TASKS_FILE).read()
-    # The "Format" section shows a task inside a code fence; don't parse it.
-    text = re.sub(r"^```.*?^```", "", text, flags=re.M | re.S)
     tasks = []
     for block in re.split(r"^## TASK:\s*", text, flags=re.M)[1:]:
         task_id, _, rest = block.partition("\n")
@@ -217,10 +220,14 @@ def write_result(out_dir, name, task, metrics, answer, reasoning):
 
 def main():
     args = sys.argv[1:]
-    effort = None
+    effort, scale = None, 1
     if "--effort" in args:
         i = args.index("--effort")
         effort = args[i + 1]
+        del args[i : i + 2]
+    if "--max-tokens-scale" in args:
+        i = args.index("--max-tokens-scale")
+        scale = int(args[i + 1])
         del args[i : i + 2]
 
     tasks = parse_tasks()
@@ -234,7 +241,7 @@ def main():
     blocked = {t["id"]: problems(t) for t in tasks if problems(t)}
     for task_id, reasons in blocked.items():
         print(f"SKIP {task_id}: {'; '.join(reasons)}")
-    tasks = [t for t in tasks if t["id"] not in blocked]
+    tasks = [{**t, "max_tokens": t["max_tokens"] * scale} for t in tasks if t["id"] not in blocked]
     if not tasks:
         sys.exit("nothing ready to run -- fill in eval/tasks.md first")
 
@@ -249,7 +256,8 @@ def main():
         print(f"[{i}/{len(tasks)}] {name} ({task['area']}) ...", flush=True)
         metrics, answer, reasoning = run_task(task, effort)
         write_result(out_dir, name, task, metrics, answer, reasoning)
-        summary[name] = {"area": task["area"], "effort": effort or "default", **metrics}
+        summary[name] = {"area": task["area"], "effort": effort or "default",
+                         "max_tokens": task["max_tokens"], **metrics}
         # Saved after every task so an interrupted run keeps what it has.
         with open(summary_path, "w") as f:
             json.dump(summary, f, indent=2)

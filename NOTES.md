@@ -28,6 +28,7 @@ the first real invoice.
 | 2026-09-25 | Phase 1 close: snapshot experiment, Copilot/OpenCode integration, agent-load testing | **$13.85 cumulative** | **$16.15** | Modal dashboard |
 | 2026-09-27 | **Phase 2 baseline** (task 1.1) — capability evaluation begins | — | **$16.15** | Modal dashboard |
 | 2026-09-28 | Group 3 gate (task 3.1) — after 250K memory test, `bf16` crash loop, long-context tests | **$2.76 this phase** | **$13.39** | Modal dashboard |
+| 2026-09-28 | Group 5 gate (task 5.1) — after decode baseline, MTP test, `low` verification (three cold starts) | **$4.95 this phase** | **$11.20** | Modal dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -678,6 +679,38 @@ the default (what users actually get), and re-runs any task that fails at
 `medium` via the per-request override, recording both. If `medium` fixes
 failures that `low` produces, the default is costing quality and that belongs in
 the findings.
+
+### 2026-09-28 — The evaluation set is synthetic, by operator choice
+
+Group 4 asked for tasks drawn from real company work. The operator chose instead
+to have the set generated: 24 tasks (6 per area) about a fictional distribution
+company, produced deterministically by `eval/make_data.py`.
+
+What this buys: **every answer is known exactly.** Six tasks are graded by running
+code (`eval/checks/`), and the rest against planted facts. Each check was first
+run against a correct reference answer (must PASS) and a plausible wrong one
+(must FAIL). All six discriminated, e.g. the SQL check caught `COUNT(*)` inflating
+order counts roughly threefold, and the SKU check caught `\d` accepting Arabic-Indic
+digits.
+
+What it costs: the verdict is about capability on *this kind* of work. It is not
+evidence about the company's own documents, formats or writing standards.
+
+The long documents were sized with the model's own tokenizer, not a
+characters-per-token guess. That matters most for the 195,259-token manual,
+which has to stay under the 250,000 limit together with its answer budget:
+
+| Document | Tokens | What it tests |
+|---|---|---|
+| Supply agreement | 75,099 | amendment overriding a clause; body vs schedule conflict |
+| Shipment register | 136,649 | counting across ~700 lines; exhaustive listing to the last line |
+| Operations manual | 195,259 | three-hop reasoning, facts at 0.2%, 76% and 100% |
+
+Two generator bugs were caught by looking at the output rather than trusting the
+code. Clause cross-references were off by one, because the body starts at
+clause 2. A handwritten remark on the delivery note covered two printed
+quantities, which would have made that vision task ungradeable. Both were fixed
+before any model run.
 
 ### 2026-09-28 — Idle for ~19 hours at zero cost
 
