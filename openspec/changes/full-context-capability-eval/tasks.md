@@ -37,16 +37,20 @@
 
 > Free — no GPU time. The tasks must come from real company work; generic prompts produce a verdict nobody will act on.
 
-- [ ] 4.1 Write `eval/tasks.md` with 20-40 concrete tasks across four areas — coding, report writing, long-document reasoning, vision — verifying each entry names a real task rather than a generic instruction
-- [ ] 4.2 For each task, state what a good answer would look like **before** the model is run, verifying every entry has one — this is what separates evaluation from a vibe check
-- [ ] 4.3 Include at least three long-document tasks supplying real documents over 50,000 tokens, verifying they genuinely exercise context rather than merely being long-ish
-- [ ] 4.4 Include at least three vision tasks using real images — scanned invoices, delivery notes, screenshots, photos of damaged goods — since this is the only model in the fleet that accepts images and the capability is completely untested
-- [ ] 4.5 Deliberately exclude agentic coding and record why: two OpenCode sessions already measured 63 requests over 10-20 minutes, so the answer is known and re-testing would spend budget confirming it
+- [x] 4.1 Write `eval/tasks.md` with 20-40 concrete tasks across four areas — coding, report writing, long-document reasoning, vision — verifying each entry names a real task rather than a generic instruction
+  - **Amended 2026-09-28, operator decision:** the tasks are synthetic rather than drawn from real company work. 24 concrete tasks (6 per area) set in a fictional distribution company, generated deterministically by `eval/make_data.py`. Every answer is known exactly, so grading is objective. The trade-off is that the findings describe capability on this *kind* of work, not value on the company's own documents.
+- [x] 4.2 For each task, state what a good answer would look like **before** the model is run, verifying every entry has one — this is what separates evaluation from a vibe check
+- [x] 4.3 Include at least three long-document tasks supplying real documents over 50,000 tokens, verifying they genuinely exercise context rather than merely being long-ish
+  - Six tasks over three documents of 75,099, 136,649 and 195,259 tokens (counted with the model's own tokenizer). The questions need aggregation, exhaustive listing, amendment precedence and three-hop reasoning, with facts placed from 0.2% to 100% of the way in, not a single needle.
+- [x] 4.4 Include at least three vision tasks using real images — scanned invoices, delivery notes, screenshots, photos of damaged goods — since this is the only model in the fleet that accepts images and the capability is completely untested
+  - Six rendered images (synthetic under the 4.1 amendment): two scan-style invoices, one with a planted arithmetic error; a delivery note with a handwritten remark; an unlabelled bar chart; a terminal traceback; and a shipping label rotated 90°.
+- [x] 4.5 Deliberately exclude agentic coding and record why: two OpenCode sessions already measured 63 requests over 10-20 minutes, so the answer is known and re-testing would spend budget confirming it
 
 ## 5. Run the evaluation
 
-- [ ] 5.1 Check the remaining balance and record it, halting if under $4
-- [ ] 5.2 Run the full set against the deployment in as few warm windows as possible, saving every output under `eval/results/2026-09-27/` alongside the exact serving flags that produced them
+- [x] 5.1 Check the remaining balance and record it, halting if under $4
+  - $11.20 on 2026-09-28 (Modal dashboard): $4.95 spent this phase, $7.05 left under the $12 ceiling.
+- [ ] 5.2 Run the full set against the deployment in as few warm windows as possible, saving every output under a dated `eval/results/<date>/` folder (the run date; planned as 2026-09-27) alongside the exact serving flags that produced them
 - [ ] 5.3 Record per-task latency and token counts, verifying the long-document and vision tasks are reported separately since their cost profiles differ sharply from short prompts
 - [ ] 5.4 Note any task where the model failed, refused, truncated, or produced an empty answer, verifying each is reproducible rather than a one-off
 
