@@ -1,0 +1,5 @@
+warmup: {"ttft_s": 2.44, "total_s": 13.08, "completion_tokens": 1200, "reasoning_tokens": 1200, "decode_tok_s": 112.7}
+run:    {"ttft_s": 135.921, "total_s": 146.51, "completion_tokens": 1200, "reasoning_tokens": 1200, "decode_tok_s": 113.3}
+run:    {"ttft_s": 0.889, "total_s": 11.57, "completion_tokens": 1200, "reasoning_tokens": 1200, "decode_tok_s": 112.2}
+run:    {"ttft_s": 0.984, "total_s": 11.63, "completion_tokens": 1200, "reasoning_tokens": 1200, "decode_tok_s": 112.7}
+summary: {"runs": 3, "decode_tok_s_mean": 112.7, "min": 112.2, "max": 113.3, "spread": 1.1}

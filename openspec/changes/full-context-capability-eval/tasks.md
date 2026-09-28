@@ -27,11 +27,11 @@
 
 ## 3. Speculative decoding
 
-- [ ] 3.1 Check the remaining balance and record it, skipping this group if under $6
-- [ ] 3.2 Add `--speculative-config '{"method":"mtp","num_speculative_tokens":3}'` as a named constant, redeploy, and verify from the startup log that speculative decoding is active rather than silently ignored
-- [ ] 3.3 Record the observed acceptance rate from the server's metrics alongside the published 0.771 figure for this checkpoint
-- [ ] 3.4 Measure tokens per second on a warm container and compare against the 44.5 tok/s recorded before this change, using a comparable prompt
-- [ ] 3.5 Keep it only if throughput improved; otherwise remove the flag, redeploy, and record the negative result so it is not retried without new evidence
+- [x] 3.1 Check the remaining balance and record it, skipping this group if under $6
+- [x] 3.2 Add `--speculative-config '{"method":"mtp","num_speculative_tokens":3}'` as a named constant, redeploy, and verify from the startup log that speculative decoding is active rather than silently ignored
+- [x] 3.3 Record the observed acceptance rate from the server's metrics alongside the published 0.771 figure for this checkpoint
+- [x] 3.4 Measure tokens per second on a warm container and compare against the 44.5 tok/s recorded before this change, using a comparable prompt
+- [x] 3.5 Keep it only if throughput improved; otherwise remove the flag, redeploy, and record the negative result so it is not retried without new evidence
 
 ## 4. Build the evaluation set
 
