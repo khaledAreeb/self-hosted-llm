@@ -203,6 +203,8 @@ REQUEST_TIMEOUT_SECONDS = 30 * 60
 # budget, consider max_containers=1 so bursts queue instead of doubling cost.
 MAX_CONCURRENT_REQUESTS = 32
 
+# Port vLLM listens on inside the container. Modal's web_server proxies the
+# public HTTPS URL to it; nothing outside the container sees this port.
 VLLM_PORT = 8000
 
 # 0.17.0 is the minimum version supporting this model's hybrid architecture.

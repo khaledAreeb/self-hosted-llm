@@ -29,6 +29,7 @@ the first real invoice.
 | 2026-09-27 | **Phase 2 baseline** (task 1.1) — capability evaluation begins | — | **$16.15** | Modal dashboard |
 | 2026-09-28 | Group 3 gate (task 3.1) — after 250K memory test, `bf16` crash loop, long-context tests | **$2.76 this phase** | **$13.39** | Modal dashboard |
 | 2026-09-28 | Group 5 gate (task 5.1) — after decode baseline, MTP test, `low` verification (three cold starts) | **$4.95 this phase** | **$11.20** | Modal dashboard |
+| 2026-09-28 | After the evaluation run (task 6.6) — two passes, repeats, one cold start | **$7.49 this phase** | **$8.66** | Modal dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -728,6 +729,16 @@ Full write-up in `eval/FINDINGS.md`. The measured facts worth having here:
 The idle window has been 10 minutes since a27b967 (2026-09-27), not 5. The
 comment in `deploy.py` and the README still said 5, and both are now corrected.
 Recorded here because earlier cost reasoning in this log assumed 5.
+
+### 2026-09-28 — Gateway parity is exact, and the balance after evaluation is $8.66
+
+Four evaluation tasks through LiteLLM came back byte-identical to the direct
+runs. Determinism turns "looks the same" into an exact test. Tool calling
+through the gateway returned the right call with the right arguments.
+
+Balance $8.66 after the evaluation run: **$7.49 spent this phase against the
+$12 ceiling**, within a cent of the estimate. The LiteLLM check reused the
+still-warm container, so it cost its idle tail (~$0.50) and no cold start.
 
 ### 2026-09-28 — Idle for ~19 hours at zero cost
 

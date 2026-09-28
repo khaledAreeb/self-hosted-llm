@@ -195,18 +195,23 @@ same kind of error:
 Not tested: whether answers stay identical when requests run concurrently.
 Batching several requests together can change results slightly.
 
+## Through the LiteLLM gateway
+
+Checked end to end on the final configuration: local LiteLLM, model name
+`qwen3.8-27B`, 2026-09-28 15:00.
+
+- **Four tasks sent through the gateway came back byte-for-byte identical to the direct runs.** The four covered code, a report, a 75K-token document and an image (`*@litellm.md`). The gateway passes long documents and images through unchanged, and determinism makes this an exact comparison.
+- **Tool calling works through the gateway.** A `get_stock_level` tool with `tool_choice: auto` produced one call with exactly the right arguments (`{"sku": "HH-DRY-10231", "warehouse": "W4"}`) and `finish_reason: tool_calls`.
+- **LiteLLM ran for about two hours unattended during this session**, and Modal showed no requests other than the evaluation's. Background health checks are not waking the GPU. This is two hours, not the overnight check still open from phase 1.
+
 ## Compared with the hosted models
 
-**Not done.** Task 6.4 asks for a comparison with the OpenRouter models already
-in use. That needs the LiteLLM gateway running with those models on a key, and
-this session has neither. The runner supports it without code changes:
+**Not done, by operator decision.** Task 6.4 asked for a comparison with the
+OpenRouter models already in use; the operator chose not to run it. The runner
+can do it later without code changes:
 
     EVAL_URL=http://localhost:4000/v1/chat/completions EVAL_KEY=<litellm key> \
     EVAL_MODEL=<hosted model name> python3 eval/run_eval.py --tag <model>
-
-The cheapest comparison that would still decide something: the five partials
-above, plus the six vision tasks, since vision is the capability the hosted
-models were said not to cover.
 
 ## Latency and cost per task (`low`)
 
@@ -246,13 +251,12 @@ Phase ceiling: **$12**, from a starting balance of $16.15.
 | Before group 3 (config tests) | $13.39 | $2.76 | Modal dashboard |
 | Before this evaluation run | $11.20 | $4.95 | Modal dashboard |
 | Mid-run, 14:26 | $10.24 | $5.91 | Modal dashboard |
-| **After the run** | **pending** | — | *to be read from the dashboard* |
+| **After the run** | **$8.66** | **$7.49** | Modal dashboard, read during the final idle window |
 
-Estimate until the final reading: the GPU was up from 14:09 to about 15:01
-(two passes, the repeats, then the 10-minute idle window), roughly 52 minutes
-at ~$2.94/hr, about $2.55. That puts the final balance near **$8.65** and phase
-spend near **$7.50**, inside the ceiling. This is an estimate, not a
-measurement; the dashboard figure replaces it.
+**$7.49 of the $12 ceiling** went on this phase: configuration tests (250K
+memory, the MTP and effort measurements, three cold starts) and this evaluation.
+The earlier estimate of $8.65 was within a cent. The LiteLLM end-to-end check
+(group 7) adds roughly $0.50 on top.
 
 ## Re-running
 

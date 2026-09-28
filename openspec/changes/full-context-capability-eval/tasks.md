@@ -60,13 +60,16 @@
 - [x] 6.1 Write `eval/FINDINGS.md` summarising what the model does well and badly per area, verifying every claim cites a specific retained output rather than an impression
 - [x] 6.2 State plainly whether the 250K context proved useful in practice or only on paper, since it is one of two reasons this deployment exists
 - [x] 6.3 State plainly whether vision works well enough to rely on, since it is the other reason and no other model in the fleet offers it
-- [ ] 6.4 Compare against the hosted OpenRouter models already in use for any task where both could plausibly be used, verifying the comparison names which is better and why
+- [x] 6.4 Compare against the hosted OpenRouter models already in use for any task where both could plausibly be used, verifying the comparison names which is better and why
+  - **Skipped by operator decision, 2026-09-28:** no comparison with the OpenRouter models is wanted. The runner supports one (`EVAL_URL`/`EVAL_KEY`/`EVAL_MODEL`) if that changes.
 - [x] 6.5 Record the final serving configuration with a comment above each flag explaining why it is set that way, especially the BF16 KV cache and its concurrency cost, so whoever later optimises for throughput knows it was a deliberate trade
   - Added the missing comments (`GPU_MEMORY_UTILIZATION`, `MAX_CONCURRENT_REQUESTS`, `VLLM_PORT`). Corrected the idle-window comment and README, which still said 5 minutes after the value became 10 in a27b967. Flagged that no `max_containers` limit exists, so a burst beyond 32 in-flight requests starts a second A100.
-- [ ] 6.6 Record total spend against the $12 ceiling, verified from the Modal dashboard
+- [x] 6.6 Record total spend against the $12 ceiling, verified from the Modal dashboard
+  - $8.66 after the evaluation run (Modal dashboard, 2026-09-28, read during the final idle window): **$7.49 spent this phase against the $12 ceiling**. The group-7 LiteLLM check comes on top, estimated at ~$0.50.
 
 ## 7. Final verification
 
-- [ ] 7.1 Verify the endpoint still serves correctly end to end through LiteLLM on the final configuration: a real request returns a coherent, non-empty answer with tool calling intact
+- [x] 7.1 Verify the endpoint still serves correctly end to end through LiteLLM on the final configuration: a real request returns a coherent, non-empty answer with tool calling intact
+  - Through local LiteLLM (`qwen3.8-27B`): 4 tasks (code, report, 75K document, image) byte-identical to the direct runs; tool call correct (`get_stock_level`, exact arguments, `finish_reason: tool_calls`); SQL answer passes its automated check.
 - [x] 7.2 Confirm `eval/tasks.md` and the retained outputs together allow the same evaluation to be re-run and compared after a future model or configuration change
   - `eval/make_data.py` regenerates all 9 inputs byte-identically (sha256 checked). The model's outputs are deterministic at temperature 0. Results, including a copy of `deploy.py`, are retained in `eval/results/2026-09-28/`.
