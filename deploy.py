@@ -83,7 +83,7 @@ MAX_MODEL_LEN = 250_000
 # Switch back to "fp8" before multi-user serving.
 KV_CACHE_DTYPE = "bfloat16"
 
-# Turn OFF the model's chain-of-thought by default.
+# Reasoning is ON at LOW effort by default.
 #
 # This model ships with "xhigh" reasoning effort. Measured behaviour before
 # this setting: a request for a 400-word explanation with max_tokens=800
@@ -96,13 +96,27 @@ KV_CACHE_DTYPE = "bfloat16"
 #     {"chat_template_kwargs": {"enable_thinking": true}}
 # Request-level kwargs always take priority over this server default.
 #
-# Currently set to MEDIUM reasoning effort: thinking is on, but on a far
-# smaller budget than the shipped default.
+# LOW rather than MEDIUM, chosen 2026-09-28 from measurement. MEDIUM does
+# answer, but it is expensive: a 300-word explanation took 2,767 reasoning
+# tokens plus 360 visible -- 88% thinking -- and needs max_tokens of ~3,500.
+# At a more typical 1,200-token budget it returned ZERO visible content.
+# Any caller sending an ordinary max_tokens would get empty answers.
+#
+# LOW keeps the model reasoning -- this phase evaluates capability, so turning
+# thinking off entirely would handicap the thing being judged -- while fitting
+# ordinary budgets. Measured on the same 300-word request: 66 reasoning
+# tokens + 411 visible, finish "stop", identical at max_tokens 1,200 and
+# 2,000. That is 477 tokens instead of 3,127 for a comparable answer.
+#
+# The catch: 66 tokens is barely any thinking. Fine for writing; unproven for
+# hard coding or long-document questions. For a genuinely hard problem, ask
+# for more per request:
+#     {"chat_template_kwargs": {"reasoning_effort": "medium"}}
 #
 # Other values:
 #   '{"enable_thinking": false}'        no reasoning at all, fastest
-#   '{"reasoning_effort": "low"}'       minimal reasoning
-#   '{"reasoning_effort": "medium"}'    current
+#   '{"reasoning_effort": "low"}'       current
+#   '{"reasoning_effort": "medium"}'    ~88% of tokens spent reasoning
 #   (unset)                             "xhigh" -- the shipped default, which
 #                                       measured 800 reasoning tokens and ZERO
 #                                       visible content on a 400-word request
@@ -110,7 +124,7 @@ KV_CACHE_DTYPE = "bfloat16"
 # With thinking on, callers must allow enough max_tokens for the reasoning
 # AND the answer. Too small a budget and the model spends it all thinking,
 # returning content: None with finish_reason "length".
-CHAT_TEMPLATE_KWARGS = '{"reasoning_effort": "medium"}'
+CHAT_TEMPLATE_KWARGS = '{"reasoning_effort": "low"}'
 
 # Tool / function calling. Required by any agent-style client (GitHub Copilot's
 # Agent mode, LangChain, etc.) -- they send tool definitions with
@@ -127,6 +141,29 @@ CHAT_TEMPLATE_KWARGS = '{"reasoning_effort": "medium"}'
 # `auto` is the path that is actually exercised, so test any client that
 # depends on the others.
 TOOL_CALL_PARSER = "qwen3_xml"
+
+# Speculative decoding using the model's own multi-token-prediction head
+# (mtp.safetensors), which ships with the checkpoint and went unused until now.
+# The head proposes several tokens at once and the main model verifies them in
+# a single forward pass, so accepted tokens are nearly free.
+#
+# num_speculative_tokens=3 follows this model's published vLLM recipe, the
+# source of its 0.771 acceptance figure for the FP8 checkpoint. Neighbouring
+# Qwen3.5/3.6 recipes use 1-2: there is a single MTP head, applied recursively
+# at depth 3, so later positions accept less often. If 3 disappoints, try 1.
+#
+# MEASURED 2026-09-28, same code and prompt, only this flag changed:
+#     without: 49.3 tok/s decode (spread 0.1)
+#     with:   112.7 tok/s decode (spread 1.1)   -> 2.29x
+# Acceptance 0.68-0.73 (published: 0.771), mean acceptance length 3.03-3.18.
+#
+# THE TRADE: vLLM caps max_num_scheduled_tokens at 2048 when this is on, which
+# chunks long prompts more finely. A 142K-token prompt with a cold prefix cache
+# went 81.4 s -> 94.8 s (~16% slower, one measurement each). Kept because
+# reasoning makes almost every request decode-heavy, and the prefix cache
+# removes prefill on repeat reads. To recover prefill speed, raise
+# --max-num-batched-tokens as vLLM itself suggests.
+SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 
 GPU_MEMORY_UTILIZATION = 0.90
 
@@ -320,6 +357,9 @@ def serve():
         "--enable-auto-tool-choice",
         "--tool-call-parser",
         TOOL_CALL_PARSER,
+        # Multi-token prediction; see SPECULATIVE_CONFIG above.
+        "--speculative-config",
+        SPECULATIVE_CONFIG,
     ]
     print("starting:", " ".join(cmd))
     subprocess.Popen(cmd)

@@ -27,6 +27,7 @@ the first real invoice.
 | 2026-09-24 | Stage 1 + gateway verification complete (tasks 4.1, 5.1) | **$2.58 cumulative** | **$27.42** | Modal dashboard |
 | 2026-09-25 | Phase 1 close: snapshot experiment, Copilot/OpenCode integration, agent-load testing | **$13.85 cumulative** | **$16.15** | Modal dashboard |
 | 2026-09-27 | **Phase 2 baseline** (task 1.1) — capability evaluation begins | — | **$16.15** | Modal dashboard |
+| 2026-09-28 | Group 3 gate (task 3.1) — after 250K memory test, `bf16` crash loop, long-context tests | **$2.76 this phase** | **$13.39** | Modal dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -534,6 +535,160 @@ Any client integration must account for this. A caller that sets a small
 `max_tokens` will receive empty responses that look like model failure but are
 budget exhaustion. This is the same failure that `enable_thinking: false`
 originally fixed, now reintroduced as a trade for reasoning quality.
+
+### 2026-09-28 — Fresh decode baseline, no MTP (task 3.4 prerequisite)
+
+Task 3.4 originally compared against phase one's 44.5 tok/s. That figure was
+measured on a different configuration — 128K context, FP8 KV cache, thinking
+off — and by different code that included time-to-first-token in the decode
+window. Comparing speculative decoding against it would have changed several
+variables at once.
+
+A fresh baseline was measured on the current configuration with
+`eval/decode_bench.py`, which both halves of the comparison share:
+
+| | Value |
+|---|---|
+| Configuration | 250K context, BF16 KV, `reasoning_effort: medium`, **no MTP** |
+| Cold start | **403 s** (was 655 s on the first start of this config) |
+| Decode, 3 runs | **49.3 / 49.4 / 49.3 tok/s** |
+| Spread | **0.1 tok/s** |
+| TTFT | ~0.95 s |
+
+**The stale baseline would have inflated any gain by ~11%.** 49.3 is faster than
+44.5 for reasons unrelated to speculative decoding — partly configuration,
+partly methodology — which is the argument for measuring both halves with
+identical code.
+
+The 0.1 tok/s spread is unusually tight, so a speculative-decoding effect well
+under 1 tok/s would still be distinguishable from noise.
+
+Cold start fell 655 → 403 s between the first and second starts of this
+configuration, as the compile cache filled — the same pattern as phase one.
+
+### 2026-09-28 — MTP speculative decoding: 2.29x decode, kept (tasks 3.2-3.5)
+
+Same code, same prompt, same configuration apart from the one flag.
+
+| | No MTP | MTP, depth 3 |
+|---|---|---|
+| Decode, 3 runs | 49.3 / 49.4 / 49.3 | 113.3 / 112.2 / 112.7 |
+| **Mean** | **49.3 tok/s** | **112.7 tok/s** |
+| Spread | 0.1 | 1.1 |
+| Cold start | 403 s | 740 s |
+
+**2.29x decode.** The 63 tok/s difference is roughly sixty times the larger
+spread, so this is not noise.
+
+Acceptance, read from vLLM's own `SpecDecoding metrics` lines rather than taken
+from the published figure:
+
+| Window | Accepted / drafted | Rate | Mean acceptance length |
+|---|---|---|---|
+| 1 | 773 / 1,062 | 0.73 | 3.18 |
+| 2 | 662 / 978 | 0.68 | 3.03 |
+| 3 | 651 / 963 | 0.68 | 3.03 |
+
+Per-position acceptance at the first draft slot was 0.83-0.86. Overall
+acceptance of **0.68-0.73 sits slightly below the published 0.771** for the FP8
+checkpoint, but a mean acceptance length above 3 — out of a maximum of 4 —
+is why the gain is so large.
+
+**The trade: long-context prefill slows down.** vLLM logged on startup:
+
+```
+max_num_scheduled_tokens is set to 2048 based on the speculative decoding
+settings. This may lead to suboptimal performance. Consider increasing
+max_num_batched_tokens to accommodate the additional draft token slots,
+or decrease num_speculative_tokens.
+```
+
+A 2,048-token scheduling cap chunks a 142K-token prompt into roughly 70 steps.
+Measured on the same 142,609-token document with a cold prefix cache:
+
+| | Total |
+|---|---|
+| No MTP | 81.4 s |
+| MTP | **94.8 s** (~16% slower) |
+
+Both runs retrieved all three planted markers, so MTP does not affect
+correctness — as expected, since speculative decoding only accepts tokens the
+base model would itself have produced.
+
+This is one measurement per configuration, so the 16% is indicative, not precise.
+
+**Why it is kept anyway.** Under `reasoning_effort: medium` nearly every request
+is generation-heavy: a 300-word answer consumed ~3,100 tokens, 88% of them
+reasoning. Decode dominates, so a 2.29x decode gain outweighs a ~16% penalty on
+the *first* read of a long document. Repeat reads are unaffected, because the
+prefix cache removes prefill almost entirely (81.4 s → 8.7 s observed earlier).
+
+**Next tuning lever, deliberately not pulled here:** raise
+`--max-num-batched-tokens` as vLLM suggests, to recover long-context prefill
+speed. That is a fourth flag, outside this change's scope, and left for the
+operator's own tuning.
+
+**One unexplained outlier.** The first measured MTP run had a TTFT of **135.9 s**,
+against 2.44 s for the warmup before it and ~0.9 s for the two runs after. Decode
+in that run was normal at 113.3 tok/s. It did not recur, and its cause is
+unknown. Worth watching during real use: a user who hit it would see a
+two-minute wait on a warm container.
+
+### 2026-09-28 — `reasoning_effort: medium` empties generative answers at 1,200 tokens
+
+In every baseline run, **all 1,200 completion tokens were reasoning; zero were
+visible.** The prompt asked for a 300-word explanation. The model spent the
+entire budget thinking and never began writing.
+
+This does not affect the throughput measurement — decode speed is the same
+whichever field a token lands in — but it matters for anyone using the endpoint:
+
+| Task shape | Observed under `medium` |
+|---|---|
+| Extraction ("report these three codes") | 131 reasoning + 35 visible — fine at 1,500 |
+| Generation ("write 300 words") | **1,200 reasoning + 0 visible** — empty at 1,200 |
+
+Generative requests need either a much larger `max_tokens`, a lower effort
+setting (`low`), or thinking disabled. A client sending a typical `max_tokens` of
+1,000-2,000 for a writing task will receive empty responses that look like model
+failure. The Copilot entry's 8,192 output limit probably clears it; LiteLLM
+defaults and ad-hoc API callers may not.
+
+### 2026-09-28 — `reasoning_effort: low` is now the default; answers are back
+
+Redeployed with `CHAT_TEMPLATE_KWARGS = '{"reasoning_effort": "low"}'` (MTP
+still on; cold start 664 s) and sent the exact request that came back empty:
+
+| Effort | max_tokens | Reasoning | Visible | Words | finish |
+|---|---|---|---|---|---|
+| medium | 1,200 | 1,200 | 0 | 0 | `length` |
+| medium | ~3,500 | 2,767 | 360 | ~300 | `stop` |
+| **low** | **1,200** | **66** | **411** | **312** | **`stop`** |
+| **low** | **2,000** | **66** | **411** | **312** | **`stop`** |
+
+The two `low` runs are identical (temperature 0), so the budget no longer
+binds: the model finishes with room to spare. For a comparable answer it used
+477 tokens instead of 3,127 — about 6.5x fewer, which at the measured MTP rate
+of ~113 tok/s is roughly 4 s of generation instead of ~28 s.
+
+**What this does not show.** 66 tokens is barely any thinking. That is fine for
+a writing task and says nothing about hard coding or long-document questions,
+where the reasoning is the point. The evaluation therefore runs every task at
+the default (what users actually get), and re-runs any task that fails at
+`medium` via the per-request override, recording both. If `medium` fixes
+failures that `low` produces, the default is costing quality and that belongs in
+the findings.
+
+### 2026-09-28 — Idle for ~19 hours at zero cost
+
+The Modal dashboard showed the last function call at 17:59 on 27 September and
+nothing further through to 13:00 the next day, with zero live containers. The
+app remained deployed throughout.
+
+This confirms scale-to-zero holds across a long idle period with the deployment
+live. It is **not** a substitute for the phase-one overnight polling check:
+LiteLLM was stopped during this window, so no gateway was present to poll. That
+check still requires the gateway running unattended.
 
 ### 2026-09-27 — A flag value is not verified by appearing in a command
 
