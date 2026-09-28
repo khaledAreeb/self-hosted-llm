@@ -50,20 +50,23 @@
 
 - [x] 5.1 Check the remaining balance and record it, halting if under $4
   - $11.20 on 2026-09-28 (Modal dashboard): $4.95 spent this phase, $7.05 left under the $12 ceiling.
-- [ ] 5.2 Run the full set against the deployment in as few warm windows as possible, saving every output under a dated `eval/results/<date>/` folder (the run date; planned as 2026-09-27) alongside the exact serving flags that produced them
-- [ ] 5.3 Record per-task latency and token counts, verifying the long-document and vision tasks are reported separately since their cost profiles differ sharply from short prompts
-- [ ] 5.4 Note any task where the model failed, refused, truncated, or produced an empty answer, verifying each is reproducible rather than a one-off
+- [x] 5.2 Run the full set against the deployment in as few warm windows as possible, saving every output under a dated `eval/results/<date>/` folder (the run date; planned as 2026-09-27) alongside the exact serving flags that produced them
+- [x] 5.3 Record per-task latency and token counts, verifying the long-document and vision tasks are reported separately since their cost profiles differ sharply from short prompts
+- [x] 5.4 Note any task where the model failed, refused, truncated, or produced an empty answer, verifying each is reproducible rather than a one-off
+  - All 10 shortfalls were re-run at the setting that produced them and came back byte-identical (deterministic at temperature 0, one request at a time). Three failure types recurred at both efforts and are recorded as systematic. Concurrent-batch determinism was not tested.
 
 ## 6. Write the findings
 
-- [ ] 6.1 Write `eval/FINDINGS.md` summarising what the model does well and badly per area, verifying every claim cites a specific retained output rather than an impression
-- [ ] 6.2 State plainly whether the 250K context proved useful in practice or only on paper, since it is one of two reasons this deployment exists
-- [ ] 6.3 State plainly whether vision works well enough to rely on, since it is the other reason and no other model in the fleet offers it
+- [x] 6.1 Write `eval/FINDINGS.md` summarising what the model does well and badly per area, verifying every claim cites a specific retained output rather than an impression
+- [x] 6.2 State plainly whether the 250K context proved useful in practice or only on paper, since it is one of two reasons this deployment exists
+- [x] 6.3 State plainly whether vision works well enough to rely on, since it is the other reason and no other model in the fleet offers it
 - [ ] 6.4 Compare against the hosted OpenRouter models already in use for any task where both could plausibly be used, verifying the comparison names which is better and why
-- [ ] 6.5 Record the final serving configuration with a comment above each flag explaining why it is set that way, especially the BF16 KV cache and its concurrency cost, so whoever later optimises for throughput knows it was a deliberate trade
+- [x] 6.5 Record the final serving configuration with a comment above each flag explaining why it is set that way, especially the BF16 KV cache and its concurrency cost, so whoever later optimises for throughput knows it was a deliberate trade
+  - Added the missing comments (`GPU_MEMORY_UTILIZATION`, `MAX_CONCURRENT_REQUESTS`, `VLLM_PORT`). Corrected the idle-window comment and README, which still said 5 minutes after the value became 10 in a27b967. Flagged that no `max_containers` limit exists, so a burst beyond 32 in-flight requests starts a second A100.
 - [ ] 6.6 Record total spend against the $12 ceiling, verified from the Modal dashboard
 
 ## 7. Final verification
 
 - [ ] 7.1 Verify the endpoint still serves correctly end to end through LiteLLM on the final configuration: a real request returns a coherent, non-empty answer with tool calling intact
-- [ ] 7.2 Confirm `eval/tasks.md` and the retained outputs together allow the same evaluation to be re-run and compared after a future model or configuration change
+- [x] 7.2 Confirm `eval/tasks.md` and the retained outputs together allow the same evaluation to be re-run and compared after a future model or configuration change
+  - `eval/make_data.py` regenerates all 9 inputs byte-identically (sha256 checked). The model's outputs are deterministic at temperature 0. Results, including a copy of `deploy.py`, are retained in `eval/results/2026-09-28/`.

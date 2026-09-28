@@ -712,6 +712,23 @@ clause 2. A handwritten remark on the delivery note covered two printed
 quantities, which would have made that vision task ungradeable. Both were fixed
 before any model run.
 
+### 2026-09-28 — Evaluation run: 18/24 at `low`, 20/24 at `medium`, no outright failures
+
+Full write-up in `eval/FINDINGS.md`. The measured facts worth having here:
+
+- **One warm window for everything.** A 313 s cold start (the fastest so far), both passes, and all repeats rode the same container, because the 10-minute idle window never expired between steps. Only one cold start was paid.
+- **Long context works in practice.** 12/12 long-document answers were correct once the budget allowed, including 3-hop reasoning at 195K tokens and exact counting across 137K.
+- **Long context is slow to generate.** Decode fell from ~125 tok/s on short prompts to 29 tok/s at 137K and 21 tok/s at 195K. Cold first read: 33 / 71 / 118 s at 75K / 137K / 195K. Cached follow-ups: ~3 s.
+- **Changing `reasoning_effort` invalidates the prefix cache.** The kwarg changes the start of the prompt template, so the `medium` pass paid full prefill again.
+- **`low` is not a cap on thinking.** One counting task used 5,928 reasoning tokens at `low` and was truncated at 6,000.
+- **`medium` cost +21% time and +43% reasoning tokens** across the set, far below the 88% reasoning share measured on one writing prompt earlier.
+- **Deterministic at temperature 0.** All 10 re-run shortfalls were byte-identical.
+- **Vision prose uses U+2011 non-breaking hyphens in codes** (`LD‑1013`). They look right and do not match in lookups. JSON output was clean.
+
+The idle window has been 10 minutes since a27b967 (2026-09-27), not 5. The
+comment in `deploy.py` and the README still said 5, and both are now corrected.
+Recorded here because earlier cost reasoning in this log assumed 5.
+
 ### 2026-09-28 — Idle for ~19 hours at zero cost
 
 The Modal dashboard showed the last function call at 17:59 on 27 September and
