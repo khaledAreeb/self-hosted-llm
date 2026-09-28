@@ -34,3 +34,8 @@ models/
 *.swp
 .idea/
 .vscode/
+
+# Real company documents and images used by eval/run_eval.py -- kept
+# local on purpose; data residency is why this deployment exists.
+eval/docs/
+eval/images/
