@@ -6,6 +6,12 @@ Run the evaluation set in eval/tasks.md against the deployed endpoint.
     python3 eval/run_eval.py code-1 vision-2  # only these tasks
     python3 eval/run_eval.py --effort medium code-1   # re-run with more thinking
     python3 eval/run_eval.py --effort medium --max-tokens-scale 4
+    python3 eval/run_eval.py --tag repeat vision-label-read      # saved beside, not over
+
+To run through a gateway instead of the endpoint directly (e.g. LiteLLM):
+
+    EVAL_URL=http://localhost:4000/v1/chat/completions EVAL_KEY=sk-... \
+    EVAL_MODEL=qwen38-27b python3 eval/run_eval.py --tag litellm report-incident
 
 Tasks run one at a time so each latency is measured without interference.
 Results go to eval/results/<today>/:
@@ -16,8 +22,8 @@ Results go to eval/results/<today>/:
     deploy.py       copy of the serving config the results came from
 
 Re-running a subset on the same day overwrites those tasks and keeps the rest.
-With --effort, results are saved as <task-id>@<effort> so they sit beside the
-default-effort result instead of replacing it. Higher effort spends far more
+With --effort or --tag, results are saved as <task-id>@<tag>@<effort> so
+they sit beside the default result instead of replacing it. Higher effort spends far more
 tokens thinking (measured: 88% at medium), so --max-tokens-scale multiplies
 every task's max_tokens to leave room for the answer.
 
@@ -38,8 +44,8 @@ import time
 import urllib.error
 import urllib.request
 
-URL = "https://dev-khaled-areeb--qwen38-27b-serve.modal.run/v1/chat/completions"
-MODEL = "Qwen/Qwen3.8-27B-FP8"
+URL = os.environ.get("EVAL_URL", "https://dev-khaled-areeb--qwen38-27b-serve.modal.run/v1/chat/completions")
+MODEL = os.environ.get("EVAL_MODEL", "Qwen/Qwen3.8-27B-FP8")
 HERE = os.path.dirname(os.path.abspath(__file__))
 TASKS_FILE = os.path.join(HERE, "tasks.md")
 AREAS = {"coding", "report", "long-document", "vision"}
@@ -129,7 +135,7 @@ def run_task(task, effort):
         data=body,
         method="POST",
         headers={
-            "Authorization": f"Bearer {os.environ['MODAL_PROXY_TOKEN']}",
+            "Authorization": f"Bearer {os.environ.get('EVAL_KEY') or os.environ['MODAL_PROXY_TOKEN']}",
             "Content-Type": "application/json",
         },
     )
@@ -220,7 +226,11 @@ def write_result(out_dir, name, task, metrics, answer, reasoning):
 
 def main():
     args = sys.argv[1:]
-    effort, scale = None, 1
+    effort, scale, tag = None, 1, None
+    if "--tag" in args:
+        i = args.index("--tag")
+        tag = args[i + 1]
+        del args[i : i + 2]
     if "--effort" in args:
         i = args.index("--effort")
         effort = args[i + 1]
@@ -252,11 +262,11 @@ def main():
     summary = json.load(open(summary_path)) if os.path.exists(summary_path) else {}
 
     for i, task in enumerate(tasks, 1):
-        name = f"{task['id']}@{effort}" if effort else task["id"]
+        name = task["id"] + "".join(f"@{x}" for x in (tag, effort) if x)
         print(f"[{i}/{len(tasks)}] {name} ({task['area']}) ...", flush=True)
         metrics, answer, reasoning = run_task(task, effort)
         write_result(out_dir, name, task, metrics, answer, reasoning)
-        summary[name] = {"area": task["area"], "effort": effort or "default",
+        summary[name] = {"area": task["area"], "effort": effort or "default", "via": URL,
                          "max_tokens": task["max_tokens"], **metrics}
         # Saved after every task so an interrupted run keeps what it has.
         with open(summary_path, "w") as f:

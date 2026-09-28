@@ -165,9 +165,19 @@ TOOL_CALL_PARSER = "qwen3_xml"
 # --max-num-batched-tokens as vLLM itself suggests.
 SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 
+# Share of the GPU's 80 GB that vLLM may claim for weights, activations and
+# KV cache (vLLM's own default). Whatever remains after the ~28 GB of weights
+# and activations becomes the KV pool -- ~42 GiB here, which is what sets the
+# ~2.8 full-length sequences above. The last 10% is headroom for CUDA graphs
+# and fragmentation; raising it gains little and risks OOM at startup.
 GPU_MEMORY_UTILIZATION = 0.90
 
-# Release the GPU after 5 minutes idle.
+# Release the GPU after 10 minutes idle.
+#
+# Raised from 5 to 10 minutes on 2026-09-27 (commit a27b967); the reason was
+# not recorded. The trade: each extra idle minute costs ~$0.05 (at ~$2.94/hr)
+# after every burst of use, in exchange for fewer cold starts when someone
+# comes back within the window. A cold start costs 5-12 minutes of GPU.
 #
 # Modal's own example ships 15 minutes. For a bursty team that is ~90 min/day
 # of paid idle GPU -- about a third of the entire pilot budget, per day.
@@ -184,8 +194,17 @@ STARTUP_TIMEOUT_SECONDS = 15 * 60
 # generations, including reasoning traces.
 REQUEST_TIMEOUT_SECONDS = 30 * 60
 
+# Requests Modal routes into ONE container at once; vLLM batches them. Short
+# requests batch well; full-context ones share the ~42 GiB KV pool and queue
+# inside vLLM once it is full.
+#
+# Beyond this number Modal starts ANOTHER container -- another A100 at full
+# price -- because no max_containers limit is set on serve(). On a fixed
+# budget, consider max_containers=1 so bursts queue instead of doubling cost.
 MAX_CONCURRENT_REQUESTS = 32
 
+# Port vLLM listens on inside the container. Modal's web_server proxies the
+# public HTTPS URL to it; nothing outside the container sees this port.
 VLLM_PORT = 8000
 
 # 0.17.0 is the minimum version supporting this model's hybrid architecture.

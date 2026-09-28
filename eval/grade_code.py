@@ -23,7 +23,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def main():
     if len(sys.argv) > 1:
-        results = sys.argv[1]
+        # Absolute, because each check runs from inside eval/checks/.
+        results = os.path.abspath(sys.argv[1])
     else:
         folders = sorted(glob.glob(os.path.join(HERE, "results", "*")))
         if not folders:

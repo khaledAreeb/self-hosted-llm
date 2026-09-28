@@ -103,7 +103,7 @@ means trusting that proxy to forward a non-standard field.
 
 ## Operating notes
 
-**Idle window is 5 minutes.** Modal's own example ships 15, which for a bursty
+**Idle window is 10 minutes** (raised from 5 on 2026-09-27). Modal's own example ships 15, which for a bursty
 team is ~90 min/day of paid idle GPU. Do not drop below ~2 minutes: a user who
 pauses 90 seconds to read an answer would otherwise trigger a cold start
 mid-conversation.
@@ -113,8 +113,8 @@ mid-conversation.
 > ### DO NOT ENABLE BACKGROUND HEALTH CHECKS FOR THIS MODEL
 >
 > LiteLLM polls every configured model every **300 seconds** by default. The
-> idle window here is also 300 seconds, so polling holds the GPU awake
-> permanently. At ~$2.94/hr that drains a $30 budget in roughly **10 hours with
+> idle window here is 600 seconds -- longer than the polling interval -- so
+> polling holds the GPU awake permanently. At ~$2.94/hr that drains a $30 budget in roughly **10 hours with
 > zero user requests** — and shortening the idle window makes it worse, not
 > better, because each cycle then pays a fresh cold start.
 >
