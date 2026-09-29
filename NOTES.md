@@ -30,6 +30,7 @@ the first real invoice.
 | 2026-09-28 | Group 3 gate (task 3.1) — after 250K memory test, `bf16` crash loop, long-context tests | **$2.76 this phase** | **$13.39** | Modal dashboard |
 | 2026-09-28 | Group 5 gate (task 5.1) — after decode baseline, MTP test, `low` verification (three cold starts) | **$4.95 this phase** | **$11.20** | Modal dashboard |
 | 2026-09-28 | After the evaluation run (task 6.6) — two passes, repeats, one cold start | **$7.49 this phase** | **$8.66** | Modal dashboard |
+| 2026-09-29 | **Phase 3 start** and window-1 gate (task 3.1). Phase 3 ceiling $4, window 1 needs ~$2.80: pass | — | **$7.85** | Modal dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -739,6 +740,87 @@ through the gateway returned the right call with the right arguments.
 Balance $8.66 after the evaluation run: **$7.49 spent this phase against the
 $12 ceiling**, within a cent of the estimate. The LiteLLM check reused the
 still-warm container, so it cost its idle tail (~$0.50) and no cold start.
+
+### 2026-09-29 — Run-to-run noise at 8 concurrent (task 4.2)
+
+`interactive-8` and `interactive-8-repeat`, same config, back to back:
+
+| | run 1 | run 2 | difference |
+|---|---|---|---|
+| visible p50 / p95 | 13.3 / 23.6 s | 12.6 / 23.5 s | 0.7 / 0.1 s |
+| generation p50 | 75.3 tok/s | 72.5 tok/s | 2.8 tok/s (~4%) |
+| total p95 | 28.3 s | 30.2 s | 1.9 s |
+| throughput | 392 tok/s | 435 tok/s | 43 tok/s (~10%) |
+
+A later "A beats B" claim at this level must exceed these. Throughput is the
+noisiest figure, because the measured window is short and bursty.
+
+One `interactive-8` request produced **no visible answer**: it thought for all
+4,000 tokens (10,637 characters of reasoning) and was cut off. The repeat had
+none. Counted as a failure, as the spec requires. It is the same
+thinking-exhausts-the-budget failure seen in phase 2, and it happens
+occasionally even at `low`.
+
+### 2026-09-29 — FP8 KV cache: accuracy holds, capacity doubles, speed shifts (tasks 3.2-3.4)
+
+**Startup (3.2).** Cold start 653 s: the first start of a new configuration,
+as with every earlier config change. vLLM's KV-cache group size went from
+**800 tokens per block on BF16 to 1,600 on FP8** at the same memory use
+(29.86 GiB consumed, 0.9 utilisation). Each block now holds twice the tokens,
+so KV capacity has doubled, which also confirms FP8 is active. The
+`GPU KV cache size` line fell outside the log tail captured, in both phases.
+
+**FP8 long-document re-check (3.3): 6/6 pass. FP8 kept.** Graded against the
+same criteria as phase 2's BF16 results (`eval/results/2026-09-29/*@fp8.md`
+vs `2026-09-28/*.md`, both at `low`):
+
+| Task | BF16 (phase 2) | FP8 |
+|---|---|---|
+| longdoc-q3-late | Partial (cut off at 6,000 tokens; top answer right) | **Pass**: all 10 supplier counts exact, finished in 5,496 tokens |
+| longdoc-rejections | Pass | Pass: 4/4 |
+| longdoc-termination | Pass | Pass: 60 days, Amendment No. 2 |
+| longdoc-payment-conflict | Pass | Pass: 8.2 vs D.4, clause 1.4 cited |
+| longdoc-audit-manager | Pass | Pass: W6, Nadia Soliman, 15 April |
+| longdoc-all-audit-failures | Pass | Pass: 5/5 |
+
+The community benchmark's FP8 accuracy loss at 256K did not show up on these tasks.
+
+**FP8 changes speed in both directions** (one request at a time):
+
+| | BF16 | FP8 | |
+|---|---|---|---|
+| Short prompt, decode (decode_bench) | 112.7 tok/s | **73.2 tok/s** | -35% |
+| 137K context, decode (q3-late) | 29 tok/s | **98 tok/s** | x3.4 |
+| First read 75K / 137K / 195K | 32.9 / 70.8 / 118 s | 37.0 / 85.4 / 139.7 s | +12-21% |
+
+The A100 has no native FP8 arithmetic, so every attention step converts
+FP8 values back before use. That plausibly explains the slower short-prompt
+decode and prefill, but it is not established. The x3.4 long-context decode
+gain is larger than halving KV bytes alone would explain; its cause is
+unknown. Under load, the doubled KV room matters more than single-request
+speed, and the load test measures that directly.
+
+**Method validation (3.4): generation speed agrees within 0.5%** (GuideLLM
+72.8 vs decode_bench 73.2 tok/s, same prompt, same container). **TTFT
+differs by ~0.45 s** (0.6 vs 1.07 s), which is more than the 10% bound. The
+cause was found and measured: decode_bench opens a new TLS connection per
+request, and `curl` shows TLS setup alone costs 0.34-0.36 s to this endpoint.
+GuideLLM reuses its connection. A constant ~0.4 s offset in the client, not
+the server, is immaterial against a 20 s target. GuideLLM's figure is the
+closer one to server-side TTFT, and it is used.
+
+### 2026-09-29 — The overnight polling check passes: LiteLLM ran 21 hours, zero GPU calls
+
+This has been open since phase 1: does LiteLLM, left running unattended, wake the
+GPU with health checks? LiteLLM ran continuously from 12:55 on 2026-09-28
+(process start time) through the next morning. The Modal dashboard shows
+no function calls between 15:00:40 on the 28th and 09:51 on the 29th, and the
+balance did not move. **Closed.** Background health checks are off by default in
+this gateway, which stores its models in its database rather than a config file.
+
+The LiteLLM check at the end of phase 2 cost ~$0.81, not the ~$0.50 estimated:
+$8.66 was read while the container was still in its idle window, and the
+10-minute idle tail after the check followed.
 
 ### 2026-09-28 — Idle for ~19 hours at zero cost
 

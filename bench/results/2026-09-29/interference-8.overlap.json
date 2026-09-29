@@ -1,0 +1,16 @@
+{
+  "start": 1790671663.556418,
+  "end": 1790671758.1458397,
+  "metrics": {
+    "prompt_tokens": 136742,
+    "completion_tokens": 587,
+    "reasoning_tokens": 336,
+    "ttft_s": 86.06,
+    "total_s": 94.58,
+    "finish_reason": "stop",
+    "answer_words": 124,
+    "empty_answer": false,
+    "truncated": false
+  },
+  "found_all_4_rejections": true
+}

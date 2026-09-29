@@ -106,4 +106,15 @@ results don't change.
 change between vLLM versions. The names this deployment actually exports are
 recorded here after the first real scrape:
 
-*(filled in by task 3.5)*
+Recorded from the first real scrape, 2026-09-29 (vLLM 0.30.0, FP8 KV):
+
+| Column | vLLM metric |
+|---|---|
+| `running` | `vllm:num_requests_running` |
+| `waiting` | `vllm:num_requests_waiting` |
+| `kv_usage` | `vllm:kv_cache_usage_perc` |
+| `preemptions` | `vllm:num_preemptions_total` |
+| `prefix_hits` / `prefix_queries` | `vllm:prefix_cache_hits_total` / `vllm:prefix_cache_queries_total` |
+| `gen_tokens` | `vllm:generation_tokens_total` |
+
+The `/metrics` endpoint is reachable through the same authenticated URL as the API.
