@@ -108,6 +108,25 @@ team is ~90 min/day of paid idle GPU. Do not drop below ~2 minutes: a user who
 pauses 90 seconds to read an answer would otherwise trigger a cold start
 mid-conversation.
 
+**How many people it serves (measured 2026-09-29, `bench/FINDINGS.md`).** One
+A100 handles **4 simultaneous interactive requests** within target: 95% of
+requests show their first visible word within 20 s. That is roughly **10–20
+people** chatting or coding, and **up to 8 coding agents** at once. Past that,
+nothing fails; answers get slower. At 8 simultaneous requests the first word
+typically takes ~13 s and the slowest ~24 s.
+
+**What users should expect at busy times:**
+- **One long document stalls everyone.** While someone's ~137K-token document is being read (about 1.5 minutes), everyone else's first word can take up to ~100 s. Warn the team, or keep huge documents for quiet times.
+- **Occasionally an empty answer.** The model can spend its whole budget thinking. Callers should allow `max_tokens` of 4,000+, and 10,000+ for document work.
+
+**One container, never two.** `max_containers=1` means a burst waits for the
+one GPU instead of silently starting a second A100 at full price. Raise it
+deliberately, with a budget, if one GPU is measured to be too slow for the team.
+
+**Serving config:** FP8 KV cache, MTP speculative decoding, thinking `low`.
+Each was measured, not assumed; see the comments in `deploy.py`. To re-measure
+capacity after any change, see `bench/README.md`.
+
 ## LiteLLM gateway configuration
 
 > ### DO NOT ENABLE BACKGROUND HEALTH CHECKS FOR THIS MODEL

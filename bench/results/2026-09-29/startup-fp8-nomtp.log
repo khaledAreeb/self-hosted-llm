@@ -1,0 +1,100 @@
+
+[1ACapturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:29<00:03,  4.76it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:30<00:03,  4.85it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:30<00:03,  4.86it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:30<00:03,  4.95it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:30<00:03,  4.99it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:30<00:02,  5.01it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:31<00:02,  5.07it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:31<00:02,  5.09it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:31<00:02,  5.19it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:31<00:01,  5.23it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:31<00:01,  5.35it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:31<00:01,  5.43it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:32<00:01,  5.47it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:32<00:01,  5.52it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:32<00:00,  5.60it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:32<00:00,  5.59it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:32<00:00,  5.65it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:33<00:00,  5.69it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:33<00:00,  5.69it/s]
+[1ACapturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:33<00:00,  5.78it/s]
+[1ACapturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:33<00:00,  1.53it/s]
+(EngineCore pid=86) 
+[1ACapturing CUDA graphs (FULL):   0%|          | 0/35 [00:00<?, ?it/s]
+[1ACapturing CUDA graphs (FULL):   3%|▎         | 1/35 [00:00<00:06,  5.55it/s]
+[1ACapturing CUDA graphs (FULL):   6%|▌         | 2/35 [00:00<00:05,  5.55it/s]
+[1ACapturing CUDA graphs (FULL):   9%|▊         | 3/35 [00:00<00:05,  5.71it/s]
+[1ACapturing CUDA graphs (FULL):  11%|█▏        | 4/35 [00:00<00:05,  5.75it/s]
+[1ACapturing CUDA graphs (FULL):  14%|█▍        | 5/35 [00:00<00:05,  5.70it/s]
+[1ACapturing CUDA graphs (FULL):  17%|█▋        | 6/35 [00:01<00:05,  5.76it/s]
+[1ACapturing CUDA graphs (FULL):  20%|██        | 7/35 [00:01<00:04,  5.80it/s]
+[1ACapturing CUDA graphs (FULL):  23%|██▎       | 8/35 [00:01<00:04,  5.90it/s]
+[1ACapturing CUDA graphs (FULL):  26%|██▌       | 9/35 [00:01<00:04,  6.21it/s]
+[1ACapturing CUDA graphs (FULL):  29%|██▊       | 10/35 [00:01<00:03,  6.27it/s]
+[1ACapturing CUDA graphs (FULL):  31%|███▏      | 11/35 [00:01<00:03,  6.40it/s]
+[1ACapturing CUDA graphs (FULL):  34%|███▍      | 12/35 [00:01<00:03,  6.41it/s]
+[1ACapturing CUDA graphs (FULL):  37%|███▋      | 13/35 [00:02<00:03,  6.50it/s]
+[1ACapturing CUDA graphs (FULL):  40%|████      | 14/35 [00:02<00:03,  6.48it/s]
+[1ACapturing CUDA graphs (FULL):  43%|████▎     | 15/35 [00:02<00:03,  6.59it/s]
+[1ACapturing CUDA graphs (FULL):  46%|████▌     | 16/35 [00:02<00:02,  6.67it/s]
+[1ACapturing CUDA graphs (FULL):  49%|████▊     | 17/35 [00:02<00:02,  6.90it/s]
+[1ACapturing CUDA graphs (FULL):  51%|█████▏    | 18/35 [00:02<00:02,  6.85it/s]
+[1ACapturing CUDA graphs (FULL):  54%|█████▍    | 19/35 [00:03<00:02,  6.80it/s]
+[1ACapturing CUDA graphs (FULL):  57%|█████▋    | 20/35 [00:03<00:02,  6.87it/s]
+[1ACapturing CUDA graphs (FULL):  60%|██████    | 21/35 [00:03<00:02,  6.94it/s]
+[1ACapturing CUDA graphs (FULL):  63%|██████▎   | 22/35 [00:03<00:01,  7.04it/s]
+[1ACapturing CUDA graphs (FULL):  66%|██████▌   | 23/35 [00:03<00:01,  7.07it/s]
+[1ACapturing CUDA graphs (FULL):  69%|██████▊   | 24/35 [00:03<00:01,  7.12it/s]
+[1ACapturing CUDA graphs (FULL):  71%|███████▏  | 25/35 [00:03<00:01,  7.22it/s]
+[1ACapturing CUDA graphs (FULL):  74%|███████▍  | 26/35 [00:03<00:01,  7.22it/s]
+[1ACapturing CUDA graphs (FULL):  77%|███████▋  | 27/35 [00:04<00:01,  7.22it/s]
+[1ACapturing CUDA graphs (FULL):  80%|████████  | 28/35 [00:04<00:00,  7.23it/s]
+[1ACapturing CUDA graphs (FULL):  83%|████████▎ | 29/35 [00:04<00:00,  7.29it/s]
+[1ACapturing CUDA graphs (FULL):  86%|████████▌ | 30/35 [00:04<00:00,  7.45it/s]
+[1ACapturing CUDA graphs (FULL):  89%|████████▊ | 31/35 [00:04<00:00,  7.56it/s]
+[1ACapturing CUDA graphs (FULL):  91%|█████████▏| 32/35 [00:04<00:00,  7.61it/s]
+[1ACapturing CUDA graphs (FULL):  94%|█████████▍| 33/35 [00:04<00:00,  7.67it/s]
+[1ACapturing CUDA graphs (FULL):  97%|█████████▋| 34/35 [00:05<00:00,  7.81it/s]
+[1ACapturing CUDA graphs (FULL): 100%|██████████| 35/35 [00:05<00:00,  7.91it/s]
+[1ACapturing CUDA graphs (FULL): 100%|██████████| 35/35 [00:05<00:00,  6.79it/s]
+(EngineCore pid=86) INFO 09-29 09:07:16 [model_runner.py:1066] Graph capturing finished in 40 secs, took 0.79 GiB
+(EngineCore pid=86) INFO 09-29 09:07:16 [gpu_worker.py:825] CUDA graph pool memory: 0.79 GiB (actual), 1.17 GiB (estimated), difference: 0.38 GiB (48.0%).
+(EngineCore pid=86) INFO 09-29 09:07:16 [gpu_worker.py:888] Free memory on device (78.84/79.25 GiB) on startup. Desired GPU memory utilization is (0.9, 71.33 GiB). Actual usage is 29.34 GiB for consumed memory (weights + non-torch), 3.05 GiB for peak activation, and 0.79 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=40801851290` (38.0 GiB) to fit into requested memory, or `--kv-cache-memory=48865885696` (45.51 GiB) to fully utilize gpu memory. Current kv cache memory in use is 38.94 GiB.
+(EngineCore pid=86) INFO 09-29 09:07:19 [jit_monitor.py:85] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=86) WARNING 09-29 09:07:20 [torch_utils.py:275] OMP_NUM_THREADS=4 is set; leaving Torch threads at 4 for serving. Multi-threaded torch CPU ops during serving can degrade performance through spin-wait contention and cgroup CPU-quota throttling.
+(EngineCore pid=86) INFO 09-29 09:07:20 [core.py:372] init engine (profile, create kv cache, warmup model) took 467.17 s (compilation: 100.49 s)
+(EngineCore pid=86) INFO 09-29 09:07:20 [kv_cache_utils.py:748] kv cache group sizes [1568, 1568, 1568, 1568]
+(EngineCore pid=86) INFO 09-29 09:07:20 [kv_cache_utils.py:749] kv lcm block sizes 1568
+(EngineCore pid=86) INFO 09-29 09:07:20 [kernel.py:416] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=86) INFO 09-29 09:07:20 [compilation.py:336] Enabled custom fusions: norm_quant, act_quant
+(APIServer pid=22) INFO 09-29 09:07:20 [entry.py:135] Supported tasks: ['generate']
+(APIServer pid=22) INFO 09-29 09:07:20 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
+(APIServer pid=22) INFO 09-29 09:07:20 [parser_manager.py:36] "auto" tool choice has been enabled.
+(APIServer pid=22) INFO 09-29 09:07:23 [hf.py:642] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=22) WARNING 09-29 09:07:23 [model.py:1772] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 20, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=22) INFO 09-29 09:07:23 [entry.py:139] Starting vLLM server on http://0.0.0.0:8000
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:61] Available routes are:
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /docs, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /load, Methods: GET
+(APIServer pid=22) INFO 09-29 09:07:23 [launcher.py:70] Route: /version, Methods: GET
+(APIServer pid=22) INFO:     Started server process [22]
+(APIServer pid=22) INFO:     Waiting for application startup.
+(APIServer pid=22) INFO:     Application startup complete.
+(APIServer pid=22) INFO:     172.20.2.58:38889 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:47735 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:53490 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:56439 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:20432 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:37487 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:21613 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:21947 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:57643 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:63784 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:40049 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:54720 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:26016 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.2.58:36508 - "GET /v1/models HTTP/1.1" 200 OK

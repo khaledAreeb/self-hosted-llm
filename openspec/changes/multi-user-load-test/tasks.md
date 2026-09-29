@@ -54,28 +54,35 @@
 
 ## 5. Window 2: MTP off under load (gated)
 
-- [ ] 5.1 Ask the operator for the balance, record it, and verify it leaves at least ~$0.70 inside the ceiling. If not, skip group 5 and record the reason, per the spec's ceiling scenario.
-- [ ] 5.2 Deploy FP8 without `--speculative-config`, cold start, and run the interactive workload at 8 and 30 with the sampler. End with stop and deploy, and verify `modal container list` is empty.
-- [ ] 5.3 Apply the rule from design.md: keep MTP only if it is at least as good as off, by more than the task 4.2 noise, at the level nearest measured capacity. Set `SPECULATIVE_CONFIG` to the winner and update its comment with the under-load result. Deploy the final configuration, and verify with `modal app list`, not by sending a request.
+- [x] 5.1 Ask the operator for the balance, record it, and verify it leaves at least ~$0.70 inside the ceiling. If not, skip group 5 and record the reason, per the spec's ceiling scenario.
+- [x] 5.2 Deploy FP8 without `--speculative-config`, cold start, and run the interactive workload at 8 and 30 with the sampler. End with stop and deploy, and verify `modal container list` is empty.
+- [x] 5.3 Apply the rule from design.md: keep MTP only if it is at least as good as off, by more than the task 4.2 noise, at the level nearest measured capacity. Set `SPECULATIVE_CONFIG` to the winner and update its comment with the under-load result. Deploy the final configuration, and verify with `modal app list`, not by sending a request.
 
 ## 6. Findings
 
-- [ ] 6.1 Write `bench/FINDINGS.md`.
+- [x] 6.1 Write `bench/FINDINGS.md`.
   - **Capacity per workload** against the targets fixed in design.md, quoting the targets beside each figure.
   - **Every knee attributed** from the sampler counters: waiting, KV full or preempted, or compute-bound.
   - **Measured results** for noise, long-document interference, FP8 accuracy and MTP.
 
   Verify every number cites a file in `bench/results/`.
-- [ ] 6.2 Add the user table: capacity turned into people at a 10% and a 20% busy fraction for interactive users, and at 100% for agent users, with a mixed-team example and no single unconditional user count. Verify each figure shows its assumption.
+- [x] 6.2 Add the user table: capacity turned into people at a 10% and a 20% busy fraction for interactive users, and at 100% for agent users, with a mixed-team example and no single unconditional user count. Verify each figure shows its assumption.
 - [ ] 6.3 Record the final spend against the $4 ceiling from a dashboard reading, and add the measured facts to `NOTES.md` (cold start of the FP8 config, noise, knees, MTP result). Verify the spend table has a row for each gate.
-- [ ] 6.4 Update the docs:
-  - `README.md` operating notes: measured capacity, `max_containers=1`, and what users should expect at busy times.
-  - `deploy.py` comments: they must match the final configuration.
-  - `GUIDE.md`: add a Part 11, "How to load test it yourself", covering the method, the gates and how to read the counters.
+- [x] 6.4 Write `bench/GUIDE.md`: a step-by-step learning guide to everything in phase 3, written for the operator so they can run and judge a load test themselves. It covers:
+  - the mental model (concurrent requests vs users, the busy fraction, time to first visible token);
+  - installing and validating the tool against a known benchmark, including the GuideLLM 0.7.4 pitfalls found (JSON split, `prefix_buckets`, warmup, the mock-server tokenizer);
+  - running and reading a level, including what each server counter means;
+  - the FP8 decision and its re-check, the MTP comparison, the cost and gate discipline, and how to turn the results into a user count.
 
-  Verify the README commands and the GUIDE's example commands run as written against the mock server.
+  Also update:
+  - `README.md` operating notes: measured capacity, `max_containers=1`, what users should expect at busy times;
+  - `deploy.py` comments, so they match the final configuration;
+  - the main `GUIDE.md`, with a short Part 11 pointing to `bench/GUIDE.md`.
+
+  Verify every command in `bench/GUIDE.md` runs as written against the mock server, and every number it quotes cites a file in `bench/results/` or `NOTES.md`.
+  - Amended 2026-09-29 at the operator's request: the full guide lives in `bench/`, not as a GUIDE.md part.
 
 ## 7. Final verification
 
-- [ ] 7.1 Verify the final deployed configuration is exactly one of the configurations exercised during a window: FP8 with MTP (window 1) or FP8 without (window 2). That way it is verified end to end without paying for another cold start.
-- [ ] 7.2 From a fresh shell, follow `bench/README.md` against the mock server end to end, and verify it produces results and a summary in the same form as the retained ones. This covers the re-runnability requirement.
+- [x] 7.1 Verify the final deployed configuration is exactly one of the configurations exercised during a window: FP8 with MTP (window 1) or FP8 without (window 2). That way it is verified end to end without paying for another cold start.
+- [x] 7.2 From a fresh shell, follow `bench/README.md` against the mock server end to end, and verify it produces results and a summary in the same form as the retained ones. This covers the re-runnability requirement.
