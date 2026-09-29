@@ -1,0 +1,108 @@
+11:37:57 interactive-30: 30 in flight, 113 requests (90 measured), cap 240 s
+sampler: running        <- vllm:num_requests_running
+sampler: waiting        <- vllm:num_requests_waiting
+sampler: kv_usage       <- vllm:kv_cache_usage_perc
+sampler: preemptions    <- vllm:num_preemptions_total
+sampler: prefix_hits    <- vllm:prefix_cache_hits_total
+sampler: prefix_queries <- vllm:prefix_cache_queries_total
+sampler: gen_tokens     <- vllm:generation_tokens_total
+✔ OpenAIHTTPBackend backend validated with model Qwen/Qwen3.8-27B-FP8
+  {'kind': 'openai_http', 'target':                                             
+  'https://dev-khaled-areeb--qwen38-27b-serve.modal.run', 'model':              
+  'Qwen/Qwen3.8-27B-FP8', 'request_format': '/v1/chat/completions', 'api_key':  
+  '**********', 'api_routes': {'/health': 'health', '/v1/models': 'v1/models',  
+  '/v1/completions': 'v1/completions', '/v1/chat/completions':                  
+  'v1/chat/completions', '/v1/embeddings': 'v1/embeddings', '/v1/responses':    
+  'v1/responses', '/v1/audio/transcriptions': 'v1/audio/transcriptions',        
+  '/v1/audio/translations': 'v1/audio/translations', '/pooling': 'pooling'},    
+  'timeout': None, 'timeout_connect': 5.0, 'http2': True, 'follow_redirects':   
+  True, 'verify': False, 'validate_backend': True, 'stream': True, 'extras':    
+  {'method': None, 'stream': None, 'headers': None, 'params': None, 'body':     
+  {'temperature': 0}, 'files': None, 'content': None}, 'max_tokens': 4000,      
+  'server_history': False, 'tool_call_missing_behavior': 'error_stop',          
+  'multiturn_reasoning': False}                                                 
+✔ Tokenizer resolved, Using tokenizer 'Qwen/Qwen3.8-27B-FP8' from arguments
+  {'kind': 'huggingface_auto', 'model': 'Qwen/Qwen3.8-27B-FP8', 'load_kwargs':  
+  {}}                                                                           
+✔ 1 datasets resolved
+  [{'kind': 'json_file', 'load_kwargs': {'split': 'train'}, 'path':             
+  'bench/datasets/interactive.json'}]                                           
+✔ 2 preprocessors resolved
+  [{'kind': 'generative_column_mapper', 'column_mappings': None}, {'kind':      
+  'encode_media', 'audio_kwargs': {}, 'image_kwargs': {}, 'video_kwargs': {}}]  
+✔ Finalizer resolved
+  {'kind': 'generative', 'tool_call_mode': 'client'}                            
+✔ Request loader resolved with inf unique requests
+  {'kind': 'pytorch', 'samples': -1, 'shuffle': False, 'num_workers': 1}        
+✔ ConcurrentProfile profile resolved
+  {'kind': 'concurrent', 'rampup_duration': 0.0, 'warmup': {'percent': None,    
+  'value': None, 'mode': 'prefer_duration'}, 'cooldown': {'percent': None,      
+  'value': None, 'mode': 'prefer_duration'}, 'streams': [30]}                   
+✔ Output formats resolved
+  [{'kind': 'json', 'path': 'bench/results/2026-09-29/interactive-30.json'}]    
+✔ Setup complete, starting benchmarks...
+
+
+
+
+
+ℹ Run Summary Info
+|============|==========|==========|=======|======|======|=========|=====|=====|==========|=====|=====|
+| Benchmark  | Timings                               ||||| Input Tokens      ||| Output Tokens      |||
+| Strategy   | Start    | End      | Dur   | Warm | Cool | Comp    | Inc | Err | Comp     | Inc | Err |
+|            |          |          | Sec   | Sec  | Sec  | Tot     | Tot | Tot | Tot      | Tot | Tot |
+|------------|----------|----------|-------|------|------|---------|-----|-----|----------|-----|-----|
+| concurrent | 11:38:06 | 11:40:41 | 155.0 | 0.0  | 0.0  | 31852.0 | 0.0 | 0.0 | 144036.0 | 0.0 | 0.0 |
+|============|==========|==========|=======|======|======|=========|=====|=====|==========|=====|=====|
+
+
+ℹ Text Metrics Statistics (Completed Requests)
+|============|========|========|=======|========|=======|=======|=======|=======|=======|========|=======|========|
+| Benchmark  | Input Tokens                  |||| Input Words                |||| Input Characters             ||||
+| Strategy   | Per Request    || Per Second    || Per Request  || Per Second   || Per Request   || Per Second    ||
+|            | Mdn    | p95    | Mdn   | Mean   | Mdn   | p95   | Mdn   | Mean  | Mdn   | p95    | Mdn   | Mean   |
+|------------|--------|--------|-------|--------|-------|-------|-------|-------|-------|--------|-------|--------|
+| concurrent | 231.0  | 660.0  | 167.2 | 232.2  | 118.0 | 384.0 | 87.8  | 120.4 | 687.0 | 2161.0 | 543.1 | 743.9  |
+|============|========|========|=======|========|=======|=======|=======|=======|=======|========|=======|========|
+| Benchmark  | Output Tokens                 |||| Output Words               |||| Output Characters            ||||
+| Strategy   | Per Request    || Per Second    || Per Request  || Per Second   || Per Request   || Per Second    ||
+|            | Mdn    | p95    | Mdn   | Mean   | Mdn   | p95   | Mdn   | Mean  | Mdn   | p95    | Mdn   | Mean   |
+|------------|--------|--------|-------|--------|-------|-------|-------|-------|-------|--------|-------|--------|
+| concurrent | 1079.0 | 2904.0 | 794.6 | 1050.0 | 172.0 | 369.0 | 115.0 | 154.6 | 914.0 | 2707.0 | 766.3 | 1012.2 |
+|============|========|========|=======|========|=======|=======|=======|=======|=======|========|=======|========|
+
+
+ℹ Request Token Statistics (Completed Requests)
+|============|=======|=======|========|========|========|========|=======|=======|=========|========|
+| Benchmark  | Input Tok    || Output Tok     || Total Tok      || Stream Iter  || Output Tok      ||
+| Strategy   | Per Req      || Per Req        || Per Req        || Per Req      || Per Stream Iter ||
+|            | Mdn   | p95   | Mdn    | p95    | Mdn    | p95    | Mdn   | p95   | Mdn     | p95    |
+|------------|-------|-------|--------|--------|--------|--------|-------|-------|---------|--------|
+| concurrent | 231.0 | 660.0 | 1079.0 | 2904.0 | 1296.0 | 3290.0 | 322.0 | 793.0 | 3.4     | 3.7    |
+|============|=======|=======|========|========|========|========|=======|=======|=========|========|
+
+
+ℹ Request Latency Statistics (Completed Requests)
+|============|=========|========|=======|========|=========|=========|======|======|======|======|
+| Benchmark  | Request Latency || TTFT          || TTFOT            || ITL        || TPOT       ||
+| Strategy   | Sec             || ms            || ms               || ms         || ms         ||
+|            | Mdn     | p95    | Mdn   | p95    | Mdn     | p95     | Mdn  | p95  | Mdn  | p95  |
+|------------|---------|--------|-------|--------|---------|---------|------|------|------|------|
+| concurrent | 32.8    | 73.1   | 995.3 | 3560.2 | 24519.9 | 65290.7 | 28.0 | 32.1 | 29.3 | 33.2 |
+|============|=========|========|=======|========|=========|=========|======|======|======|======|
+
+
+ℹ Server Throughput Statistics (All Requests)
+|============|=======|======|=========|==============|===============|==============|
+| Benchmark  | Requests             ||| Input Tokens | Output Tokens | Total Tokens |
+| Strategy   | Concurrency || Per Sec | Per Sec      | Per Sec       | Per Sec      |
+|            | Mdn   | Mean | Mean                                               ||||
+|------------|-------|------|---------|--------------|---------------|--------------|
+| concurrent | 30.0  | 27.0 | 0.7     | 205.5        | 929.5         | 1135.0       |
+|============|=======|======|=========|==============|===============|==============|
+
+
+
+✔ Benchmarking complete, generated 1 benchmark(s)
+…   json    : bench/results/2026-09-29/interactive-30.json
+11:40:43 interactive-30: done -> bench/results/2026-09-29/interactive-30.json

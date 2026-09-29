@@ -1,0 +1,116 @@
+11:42:15 agent-1: 1 in flight, 25 requests (20 measured), cap 240 s
+sampler: running        <- vllm:num_requests_running
+sampler: waiting        <- vllm:num_requests_waiting
+sampler: kv_usage       <- vllm:kv_cache_usage_perc
+sampler: preemptions    <- vllm:num_preemptions_total
+sampler: prefix_hits    <- vllm:prefix_cache_hits_total
+sampler: prefix_queries <- vllm:prefix_cache_queries_total
+sampler: gen_tokens     <- vllm:generation_tokens_total
+✔ OpenAIHTTPBackend backend validated with model Qwen/Qwen3.8-27B-FP8
+  {'kind': 'openai_http', 'target':                                             
+  'https://dev-khaled-areeb--qwen38-27b-serve.modal.run', 'model':              
+  'Qwen/Qwen3.8-27B-FP8', 'request_format': '/v1/chat/completions', 'api_key':  
+  '**********', 'api_routes': {'/health': 'health', '/v1/models': 'v1/models',  
+  '/v1/completions': 'v1/completions', '/v1/chat/completions':                  
+  'v1/chat/completions', '/v1/embeddings': 'v1/embeddings', '/v1/responses':    
+  'v1/responses', '/v1/audio/transcriptions': 'v1/audio/transcriptions',        
+  '/v1/audio/translations': 'v1/audio/translations', '/pooling': 'pooling'},    
+  'timeout': None, 'timeout_connect': 5.0, 'http2': True, 'follow_redirects':   
+  True, 'verify': False, 'validate_backend': True, 'stream': True, 'extras':    
+  {'method': None, 'stream': None, 'headers': None, 'params': None, 'body':     
+  {'temperature': 0}, 'files': None, 'content': None}, 'max_tokens': 300,       
+  'server_history': False, 'tool_call_missing_behavior': 'error_stop',          
+  'multiturn_reasoning': False}                                                 
+✔ Tokenizer resolved, Using tokenizer 'Qwen/Qwen3.8-27B-FP8' from arguments
+  {'kind': 'huggingface_auto', 'model': 'Qwen/Qwen3.8-27B-FP8', 'load_kwargs':  
+  {}}                                                                           
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+✔ 1 datasets resolved
+  [{'kind': 'synthetic_text', 'load_kwargs': {}, 'prompt_tokens': 1000,         
+  'prompt_tokens_stdev': None, 'prompt_tokens_min': None, 'prompt_tokens_max':  
+  None, 'output_tokens': 300, 'output_tokens_stdev': None, 'output_tokens_min': 
+  None, 'output_tokens_max': None, 'delay': None, 'delay_stdev': None,          
+  'delay_min': None, 'delay_max': None, 'turns': 1, 'tool_call_turns': [],      
+  'tools': None, 'tool_response_tokens': None, 'tool_response_tokens_stdev':    
+  None, 'tool_response_tokens_min': None, 'tool_response_tokens_max': None,     
+  'server_tool_call_turns': [], 'prefix_buckets': [{'bucket_weight': 100,       
+  'prefix_count': 1, 'prefix_tokens': 16000}]}]                                 
+✔ 2 preprocessors resolved
+  [{'kind': 'generative_column_mapper', 'column_mappings': None}, {'kind':      
+  'encode_media', 'audio_kwargs': {}, 'image_kwargs': {}, 'video_kwargs': {}}]  
+✔ Finalizer resolved
+  {'kind': 'generative', 'tool_call_mode': 'client'}                            
+✔ Request loader resolved with inf unique requests
+  {'kind': 'pytorch', 'samples': -1, 'shuffle': False, 'num_workers': 1}        
+✔ ConcurrentProfile profile resolved
+  {'kind': 'concurrent', 'rampup_duration': 0.0, 'warmup': {'percent': None,    
+  'value': None, 'mode': 'prefer_duration'}, 'cooldown': {'percent': None,      
+  'value': None, 'mode': 'prefer_duration'}, 'streams': [1]}                    
+✔ Output formats resolved
+  [{'kind': 'json', 'path': 'bench/results/2026-09-29/agent-1.json'}]           
+✔ Setup complete, starting benchmarks...
+
+
+
+
+
+ℹ Run Summary Info
+|============|==========|==========|=======|======|======|==========|=====|=====|========|=====|=====|
+| Benchmark  | Timings                               ||||| Input Tokens       ||| Output Tokens    |||
+| Strategy   | Start    | End      | Dur   | Warm | Cool | Comp     | Inc | Err | Comp   | Inc | Err |
+|            |          |          | Sec   | Sec  | Sec  | Tot      | Tot | Tot | Tot    | Tot | Tot |
+|------------|----------|----------|-------|------|------|----------|-----|-----|--------|-----|-----|
+| concurrent | 11:42:25 | 11:44:47 | 141.9 | 0.0  | 0.0  | 426024.0 | 0.0 | 0.0 | 7500.0 | 0.0 | 0.0 |
+|============|==========|==========|=======|======|======|==========|=====|=====|========|=====|=====|
+
+
+ℹ Text Metrics Statistics (Completed Requests)
+|============|=========|=========|========|========|=========|=========|========|========|=========|=========|=========|=========|
+| Benchmark  | Input Tokens                     |||| Input Words                      |||| Input Characters                   ||||
+| Strategy   | Per Request      || Per Second     || Per Request      || Per Second     || Per Request      || Per Second       ||
+|            | Mdn     | p95     | Mdn    | Mean   | Mdn     | p95     | Mdn    | Mean   | Mdn     | p95     | Mdn     | Mean    |
+|------------|---------|---------|--------|--------|---------|---------|--------|--------|---------|---------|---------|---------|
+| concurrent | 17041.0 | 17041.0 | 3109.9 | 3246.2 | 13390.0 | 13397.0 | 2443.4 | 2550.8 | 89695.0 | 89781.0 | 16358.8 | 17084.3 |
+|============|=========|=========|========|========|=========|=========|========|========|=========|=========|=========|=========|
+| Benchmark  | Output Tokens                    |||| Output Words                     |||| Output Characters                  ||||
+| Strategy   | Per Request      || Per Second     || Per Request      || Per Second     || Per Request      || Per Second       ||
+|            | Mdn     | p95     | Mdn    | Mean   | Mdn     | p95     | Mdn    | Mean   | Mdn     | p95     | Mdn     | Mean    |
+|------------|---------|---------|--------|--------|---------|---------|--------|--------|---------|---------|---------|---------|
+| concurrent | 300.0   | 300.0   | 54.7   | 57.1   | 116.0   | 127.0   | 21.0   | 21.5   | 685.0   | 777.0   | 125.0   | 128.1   |
+|============|=========|=========|========|========|=========|=========|========|========|=========|=========|=========|=========|
+
+
+ℹ Request Token Statistics (Completed Requests)
+|============|=========|=========|=======|=======|=========|=========|=======|=======|=========|========|
+| Benchmark  | Input Tok        || Output Tok   || Total Tok        || Stream Iter  || Output Tok      ||
+| Strategy   | Per Req          || Per Req      || Per Req          || Per Req      || Per Stream Iter ||
+|            | Mdn     | p95     | Mdn   | p95   | Mdn     | p95     | Mdn   | p95   | Mdn     | p95    |
+|------------|---------|---------|-------|-------|---------|---------|-------|-------|---------|--------|
+| concurrent | 17041.0 | 17041.0 | 300.0 | 300.0 | 17341.0 | 17341.0 | 103.0 | 108.0 | 3.0     | 3.2    |
+|============|=========|=========|=======|=======|=========|=========|=======|=======|=========|========|
+
+
+ℹ Request Latency Statistics (Completed Requests)
+|============|=========|========|========|========|========|========|======|======|======|======|
+| Benchmark  | Request Latency || TTFT           || TTFOT          || ITL        || TPOT       ||
+| Strategy   | Sec             || ms             || ms             || ms         || ms         ||
+|            | Mdn     | p95    | Mdn    | p95    | Mdn    | p95    | Mdn  | p95  | Mdn  | p95  |
+|------------|---------|--------|--------|--------|--------|--------|------|------|------|------|
+| concurrent | 5.5     | 5.8    | 1784.4 | 2013.9 | 3635.9 | 5218.2 | 12.2 | 13.0 | 18.2 | 19.3 |
+|============|=========|========|========|========|========|========|======|======|======|======|
+
+
+ℹ Server Throughput Statistics (All Requests)
+|============|=======|======|=========|==============|===============|==============|
+| Benchmark  | Requests             ||| Input Tokens | Output Tokens | Total Tokens |
+| Strategy   | Concurrency || Per Sec | Per Sec      | Per Sec       | Per Sec      |
+|            | Mdn   | Mean | Mean                                               ||||
+|------------|-------|------|---------|--------------|---------------|--------------|
+| concurrent | 1.0   | 1.0  | 0.2     | 3002.3       | 52.9          | 3055.1       |
+|============|=======|======|=========|==============|===============|==============|
+
+
+
+✔ Benchmarking complete, generated 1 benchmark(s)
+…   json    : bench/results/2026-09-29/agent-1.json
+11:44:48 agent-1: done -> bench/results/2026-09-29/agent-1.json

@@ -1,0 +1,101 @@
+
+[1ACapturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:29<00:04,  5.00it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:29<00:04,  5.03it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:29<00:04,  4.94it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:29<00:04,  4.85it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:29<00:03,  4.80it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:30<00:03,  4.90it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:30<00:03,  4.81it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:30<00:03,  4.78it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:30<00:03,  4.77it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:30<00:03,  4.66it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:31<00:03,  4.12it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:31<00:02,  4.22it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:31<00:02,  4.33it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:31<00:02,  4.43it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:32<00:02,  4.43it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:32<00:01,  4.41it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:32<00:01,  4.44it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:32<00:01,  4.48it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:33<00:01,  4.52it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:33<00:00,  4.46it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:33<00:00,  4.29it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:33<00:00,  4.33it/s]
+[1ACapturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:33<00:00,  4.38it/s]
+[1ACapturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:34<00:00,  4.42it/s]
+[1ACapturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:34<00:00,  1.49it/s]
+(EngineCore pid=86) INFO 09-29 08:16:34 [speculator.py:151] Capturing model for speculator...
+(EngineCore pid=86) 
+[1ACapturing prefill CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:01, 35.78it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:01, 37.00it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:00<00:00, 39.48it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:00<00:00, 45.36it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:00<00:00, 53.31it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:00<00:00, 61.15it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:00<00:00, 58.74it/s]
+[1ACapturing prefill CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:00<00:00, 64.28it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:00<00:00, 56.52it/s]
+(EngineCore pid=86) INFO 09-29 08:16:36 [model_runner.py:1066] Graph capturing finished in 37 secs, took 0.27 GiB
+(EngineCore pid=86) INFO 09-29 08:16:36 [gpu_worker.py:825] CUDA graph pool memory: 0.27 GiB (actual), 1.25 GiB (estimated), difference: 0.97 GiB (356.4%).
+(EngineCore pid=86) INFO 09-29 08:16:36 [gpu_worker.py:888] Free memory on device (78.84/79.25 GiB) on startup. Desired GPU memory utilization is (0.9, 71.33 GiB). Actual usage is 29.86 GiB for consumed memory (weights + non-torch), 3.13 GiB for peak activation, and 0.27 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=40705382298` (37.91 GiB) to fit into requested memory, or `--kv-cache-memory=48769416704` (45.42 GiB) to fully utilize gpu memory. Current kv cache memory in use is 38.33 GiB.
+(EngineCore pid=86) INFO 09-29 08:16:38 [jit_monitor.py:85] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=86) WARNING 09-29 08:16:39 [torch_utils.py:275] OMP_NUM_THREADS=4 is set; leaving Torch threads at 4 for serving. Multi-threaded torch CPU ops during serving can degrade performance through spin-wait contention and cgroup CPU-quota throttling.
+(EngineCore pid=86) INFO 09-29 08:16:39 [core.py:372] init engine (profile, create kv cache, warmup model) took 501.45 s (compilation: 110.18 s)
+(EngineCore pid=86) INFO 09-29 08:16:39 [kv_cache_utils.py:748] kv cache group sizes [1600, 1600, 1600, 1600]
+(EngineCore pid=86) INFO 09-29 08:16:39 [kv_cache_utils.py:749] kv lcm block sizes 1600
+(EngineCore pid=86) INFO 09-29 08:16:39 [kernel.py:416] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=86) WARNING 09-29 08:16:39 [vllm.py:2135] max_num_scheduled_tokens is set to 2048 based on the speculative decoding settings. This may lead to suboptimal performance. Consider increasing max_num_batched_tokens to accommodate the additional draft token slots, or decrease num_speculative_tokens.
+(EngineCore pid=86) INFO 09-29 08:16:39 [compilation.py:336] Enabled custom fusions: norm_quant, act_quant
+(APIServer pid=22) INFO 09-29 08:16:39 [entry.py:135] Supported tasks: ['generate']
+(APIServer pid=22) INFO 09-29 08:16:40 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
+(APIServer pid=22) INFO 09-29 08:16:40 [parser_manager.py:36] "auto" tool choice has been enabled.
+(APIServer pid=22) INFO 09-29 08:16:43 [hf.py:642] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=22) WARNING 09-29 08:16:43 [model.py:1772] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 20, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=22) INFO 09-29 08:16:43 [entry.py:139] Starting vLLM server on http://0.0.0.0:8000
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:61] Available routes are:
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /docs, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /load, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /version, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /health, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /metrics, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /tokenize, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /detokenize, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/models, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /ping, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /ping, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /invocations, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/responses, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/completions, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/messages, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /generative_scoring, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=22) INFO 09-29 08:16:43 [launcher.py:70] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=22) INFO:     Started server process [22]
+(APIServer pid=22) INFO:     Waiting for application startup.
+(APIServer pid=22) INFO:     Application startup complete.
+(APIServer pid=22) INFO:     172.20.1.202:44348 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:32811 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:20916 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:19146 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:27965 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:22802 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:16406 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:51182 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:19245 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:30761 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:36606 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:48594 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:53794 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:21825 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:45390 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:31446 - "GET /v1/models HTTP/1.1" 200 OK
+(APIServer pid=22) INFO:     172.20.1.202:55453 - "GET /v1/models HTTP/1.1" 200 OK
+    GET /v1/models -> 200 OK  (duration: 360.2 ms, execution: 219.2 ms)

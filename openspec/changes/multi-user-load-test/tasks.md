@@ -31,24 +31,26 @@
 
 > Paid. The spec requires the balance to be read before this group. The ~$2.80 window only runs if it stays inside the $4 ceiling.
 
-- [ ] 3.1 Ask the operator for the Modal dashboard balance, record it in `NOTES.md`'s spend table, and verify it leaves at least $2.80 inside the ceiling. If not, stop here.
-- [ ] 3.2 Trigger the cold start with the fatal-error log checks used in phase 2 (every 90 s), and record the cold-start time. Verify the startup log reports an FP8 KV cache, and a KV-cache token capacity about twice phase 2's BF16 figure.
-- [ ] 3.3 Re-run the six `longdoc-*` tasks at the default effort (`eval/run_eval.py --tag fp8`). Grade each against its `eval/tasks.md` criteria and the retained BF16 result (`longdoc-*.md` from 2026-09-28), and record the comparison task by task in `NOTES.md`.
+- [x] 3.1 Ask the operator for the Modal dashboard balance, record it in `NOTES.md`'s spend table, and verify it leaves at least $2.80 inside the ceiling. If not, stop here.
+- [x] 3.2 Trigger the cold start with the fatal-error log checks used in phase 2 (every 90 s), and record the cold-start time. Verify the startup log reports an FP8 KV cache, and a KV-cache token capacity about twice phase 2's BF16 figure.
+- [x] 3.3 Re-run the six `longdoc-*` tasks at the default effort (`eval/run_eval.py --tag fp8`). Grade each against its `eval/tasks.md` criteria and the retained BF16 result (`longdoc-*.md` from 2026-09-28), and record the comparison task by task in `NOTES.md`.
   - If accuracy holds, keep FP8.
   - If any task falls below its BF16 result, make and record the explicit accuracy-versus-concurrency decision the spec requires before going on. A BF16 fallback means another cold start: re-check the ceiling first.
-- [ ] 3.4 Validate the method. On the warm container, run GuideLLM one request at a time on the `decode_bench.py` prompt, then run `eval/decode_bench.py 3`. Verify TTFT and generation speed agree within 10%, and record both. If they don't, find the cause or switch to the fallback script described in design.md before group 4.
-- [ ] 3.5 Take the first `/metrics` scrape with the sampler. Record the actual metric names in `bench/README.md`, and verify all four series (running, waiting, KV use, preemptions) are populated.
+- [x] 3.4 Validate the method. On the warm container, run GuideLLM one request at a time on the `decode_bench.py` prompt, then run `eval/decode_bench.py 3`. Verify TTFT and generation speed agree within 10%, and record both. If they don't, find the cause or switch to the fallback script described in design.md before group 4.
+  - Generation speed within 0.5%. TTFT offset ~0.45 s: cause found and measured (decode_bench opens a new TLS connection per request, 0.34-0.36 s). GuideLLM kept; see NOTES.md.
+- [x] 3.5 Take the first `/metrics` scrape with the sampler. Record the actual metric names in `bench/README.md`, and verify all four series (running, waiting, KV use, preemptions) are populated.
 
 ## 4. Window 1: load runs
 
 > Same warm window as group 3. The sampler runs throughout every level.
 
-- [ ] 4.1 Run the interactive workload at 1, 4, 8, 16 and 30 concurrent. Verify each level either reaches `max(20, 3×N)` completions or is flagged as short, and that every level's output and sampler CSV are saved.
-- [ ] 4.2 Repeat the interactive level at 8 and record the difference between the two runs in `NOTES.md` as run-to-run noise. Later "faster/slower" claims must exceed it.
-- [ ] 4.3 Run the agent workload at 1, 4 and 8 concurrent (16K-token shared prefix, 1K unique, 300 output). Verify results are saved and the sampler shows no preemptions. If it does show any, record them as the finding.
-- [ ] 4.4 Run the interference case: interactive at 8, with one 137K-token document request (given a unique first line so it isn't served from cache) sent mid-run via `eval/run_eval.py`. Record the document request's TTFT and total time, and the interactive p95 figures during versus outside its read.
-- [ ] 4.5 End the window with `modal app stop` then `modal deploy`. Verify that `modal container list` is empty and `modal app list` still shows the app deployed, without sending any request, since a request would start a container.
-- [ ] 4.6 Scan everything under `bench/results/` for the proxy token (the secret half), and verify there are no matches before anything is committed.
+- [x] 4.1 Run the interactive workload at 1, 4, 8, 16 and 30 concurrent. Verify each level either reaches `max(20, 3×N)` completions or is flagged as short, and that every level's output and sampler CSV are saved.
+  - Level 1 hit the 4-minute cap at 16 measured requests and is flagged SHORT; every other level reached its count.
+- [x] 4.2 Repeat the interactive level at 8 and record the difference between the two runs in `NOTES.md` as run-to-run noise. Later "faster/slower" claims must exceed it.
+- [x] 4.3 Run the agent workload at 1, 4 and 8 concurrent (16K-token shared prefix, 1K unique, 300 output). Verify results are saved and the sampler shows no preemptions. If it does show any, record them as the finding.
+- [x] 4.4 Run the interference case: interactive at 8, with one 137K-token document request (given a unique first line so it isn't served from cache) sent mid-run via `eval/run_eval.py`. Record the document request's TTFT and total time, and the interactive p95 figures during versus outside its read.
+- [x] 4.5 End the window with `modal app stop` then `modal deploy`. Verify that `modal container list` is empty and `modal app list` still shows the app deployed, without sending any request, since a request would start a container.
+- [x] 4.6 Scan everything under `bench/results/` for the proxy token (the secret half), and verify there are no matches before anything is committed.
 
 ## 5. Window 2: MTP off under load (gated)
 

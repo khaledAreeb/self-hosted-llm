@@ -96,7 +96,28 @@ def level_stats(path):
         "tput": out_tokens / span if span > 0 else None,
     }
     stats.update(server_counters(path[:-5] + ".metrics.csv", window))
+    stats["overlap"] = overlap_split(path[:-5] + ".overlap.json", measured)
     return stats
+
+
+def overlap_split(overlap_path, measured):
+    """For the interference level: requests that overlapped the long read vs not."""
+    if not os.path.exists(overlap_path):
+        return None
+    o = json.load(open(overlap_path))
+    groups = {"during": [], "outside": []}
+    for status, r in measured:
+        if status != "successful":
+            continue
+        hit = r["request_start_time"] < o["end"] and r["request_end_time"] > o["start"]
+        groups["during" if hit else "outside"].append(r)
+    summary = {"long_request": o["metrics"], "found_all_4_rejections": o.get("found_all_4_rejections")}
+    for name, rs in groups.items():
+        vis = [r["time_to_first_output_token_ms"] / 1000 for r in rs if r.get("time_to_first_output_token_ms")]
+        tot = [r["request_latency"] for r in rs]
+        summary[name] = {"n": len(rs), "visible_p50": pct(vis, 50), "visible_p95": pct(vis, 95),
+                         "total_p50": pct(tot, 50), "total_p95": pct(tot, 95)}
+    return summary
 
 
 def server_counters(csv_path, window):
@@ -138,7 +159,8 @@ def fmt(v, digits=1):
 
 def main():
     folder = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(HERE, "results", "*")))[-1]
-    levels = [level_stats(p) for p in sorted(glob.glob(os.path.join(folder, "*.json")))]
+    levels = [level_stats(p) for p in sorted(glob.glob(os.path.join(folder, "*.json")))
+              if not p.endswith(".overlap.json")]
     if not levels:
         sys.exit(f"no results in {folder}")
     for workload in sorted({s["workload"] for s in levels}):
@@ -155,6 +177,17 @@ def main():
                   f"| {fmt(pct(s['total'], 50))} / {fmt(pct(s['total'], 95))} "
                   f"| {fmt(s['tput'], 0)} | {s['fail']} | {fmt(s['run'], 0)} | {fmt(s['wait'], 0)} "
                   f"| {fmt(s['kv'], 2)} | {fmt(s['preempt'], 0)} | {verdict(s)} |")
+    for s in levels:
+        if s.get("overlap"):
+            o = s["overlap"]
+            lr = o["long_request"]
+            print(f"\n## {s['label']}: one {lr.get('prompt_tokens')}-token document among {s['streams']} users")
+            print(f"long request: first token {fmt(lr.get('ttft_s'))} s, total {fmt(lr.get('total_s'))} s, "
+                  f"all 4 rejections found: {o['found_all_4_rejections']}")
+            for name in ("outside", "during"):
+                g = o[name]
+                print(f"  {name:8} its read: n={g['n']:3}  visible p50/p95 {fmt(g['visible_p50'])} / {fmt(g['visible_p95'])} s"
+                      f"  total p50/p95 {fmt(g['total_p50'])} / {fmt(g['total_p95'])} s")
     print("\ngen p5 = the speed 95% of requests met or beat. kv = peak KV-cache use (0-1). "
           "preempt = preemptions during the measured window.")
 

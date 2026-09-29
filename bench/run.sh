@@ -5,6 +5,7 @@
 #   bench/run.sh agent 4
 #   bench/run.sh interactive 8 --label interactive-8-repeat
 #   bench/run.sh interactive 4 --target http://127.0.0.1:8123 --no-sampler   # mock server
+#   bench/run.sh interactive 8 --label interference-8 --requests 60   # see interference.py
 #
 # Writes bench/results/<date>/<label>.json  (GuideLLM's full results)
 #        bench/results/<date>/<label>.metrics.csv  (vLLM's own counters, 5 s)
@@ -30,6 +31,7 @@ while [ $# -gt 0 ]; do
     --label) LABEL=$2; shift 2 ;;
     --target) TARGET=$2; shift 2 ;;
     --no-sampler) SAMPLER=0; shift ;;
+    --requests) FORCE_TOTAL=$2; shift 2 ;;   # override, e.g. to span a long request
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -47,6 +49,7 @@ KEY=${BENCH_API_KEY:-$MODAL_PROXY_TOKEN}
 # Enough requests that max(20, 3N) remain after dropping 10% warmup + 10% cooldown.
 MEASURED=$(( STREAMS * 3 > 20 ? STREAMS * 3 : 20 ))
 TOTAL=$(( (MEASURED * 10 + 7) / 8 ))
+TOTAL=${FORCE_TOTAL:-$TOTAL}
 
 case "$WORKLOAD" in
   interactive)
