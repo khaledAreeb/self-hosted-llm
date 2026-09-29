@@ -61,27 +61,24 @@ GPU = "A100-80GB"
 # capability evaluation: a weak answer could be the model or the scaling,
 # with no way to tell which.
 #
-# At 250K with a BF16 KV cache one full-length sequence needs 15.26 GiB
-# against a ~43 GiB pool -- about 2.8 concurrent at full length. Ample for
-# evaluation, too few for serving a team. Revisit before multi-user use.
+# At 250K one full-length sequence needs 7.6 GiB of FP8 KV cache (15.26 GiB
+# at BF16) against a ~42 GiB pool -- about 5.6 at full length at once. Most
+# requests are far shorter: KV is allocated per actual token, so this limit
+# caps one request's size, it does not reserve memory for it.
 MAX_MODEL_LEN = 250_000
 
-# BF16 rather than FP8, deliberately, for this evaluation phase.
+# FP8 for multi-user serving (phase 3, 2026-09-29).
 #
-# FP8 halves KV bytes per token (64 KB -> 32 KB at this model's shape) and is
-# the right choice for throughput. But a community benchmark on this model
-# measured KV precision at 256K context: BF16 scored 0.833, FP8 scored 0.717.
-# At 32K that gap does not appear; at 250K it is exactly the regime in use.
+# FP8 stores KV at 32 KB/token instead of BF16's 64 KB, doubling the pool to
+# ~1.4M tokens (~5.6 full-length requests instead of ~2.8). That room is what
+# several people sending long prompts at once -- agents, documents -- need.
 #
-# Evaluating long-document capability on the weaker cache risks the worst kind
-# of wrong conclusion -- deciding the MODEL is poor at long context when the
-# SETTING was. Since the point of this phase is judging the model, it runs on
-# the configuration that handicaps it least.
-#
-# The cost is real: concurrency at full length halves, ~5.6 -> ~2.8 sequences.
-# Wrong trade for serving thirty people, right trade for judging quality.
-# Switch back to "fp8" before multi-user serving.
-KV_CACHE_DTYPE = "bfloat16"
+# Phase 2 ran BF16 on purpose: a community benchmark scored FP8 0.717 vs BF16
+# 0.833 at 256K context, and judging the MODEL on a weaker cache risked
+# blaming it for the SETTING. So FP8 is kept only if the six phase-2
+# long-document tasks still pass on it -- see NOTES.md, "FP8 long-document
+# re-check". If they do not, the decision and its trade are recorded there.
+KV_CACHE_DTYPE = "fp8"
 
 # Reasoning is ON at LOW effort by default.
 #
@@ -198,10 +195,16 @@ REQUEST_TIMEOUT_SECONDS = 30 * 60
 # requests batch well; full-context ones share the ~42 GiB KV pool and queue
 # inside vLLM once it is full.
 #
-# Beyond this number Modal starts ANOTHER container -- another A100 at full
-# price -- because no max_containers limit is set on serve(). On a fixed
-# budget, consider max_containers=1 so bursts queue instead of doubling cost.
+# Beyond this number, requests wait for a free slot: MAX_CONTAINERS below
+# stops Modal from starting a second A100 to absorb them.
 MAX_CONCURRENT_REQUESTS = 32
+
+# One GPU container, at most. Without a limit, request 33 would start a second
+# A100 at full price -- silently doubling the bill during a burst, and making
+# a load test measure two GPUs while reporting one. With it, bursts queue on
+# the one GPU and get slower instead of more expensive. Raise it deliberately,
+# with a budget, when one GPU is measured to be not enough.
+MAX_CONTAINERS = 1
 
 # Port vLLM listens on inside the container. Modal's web_server proxies the
 # public HTTPS URL to it; nothing outside the container sees this port.
@@ -337,6 +340,7 @@ def download():
     memory=MEMORY_MB,
     scaledown_window=IDLE_WINDOW_SECONDS,
     timeout=REQUEST_TIMEOUT_SECONDS,
+    max_containers=MAX_CONTAINERS,
 )
 @modal.concurrent(max_inputs=MAX_CONCURRENT_REQUESTS)
 @modal.web_server(
