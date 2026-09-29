@@ -4,25 +4,26 @@
 
 > Everything here is tested against GuideLLM's built-in mock server, which imitates an OpenAI endpoint on the laptop. No GPU time is spent until group 3.
 
-- [ ] 1.1 Create `bench/` with a git-ignored `bench/.venv`. Install GuideLLM 0.7.x there with CPU-only torch, and verify `guidellm run --help` lists the `openai_http` backend and the `concurrent` profile. Also verify `git status` shows no `.venv` files.
-- [ ] 1.2 Write `bench/make_datasets.py`. It builds `bench/datasets/interactive.json` from the 12 coding and report prompts in `eval/tasks.md`, reusing the eval parser. Verify the file has exactly 12 entries, each prompt matches its source task text, and none contains `FORMAT EXAMPLE`.
-- [ ] 1.3 Write `bench/run.sh`, which runs one named workload (`interactive`, `agent`) at one concurrency level.
+- [x] 1.1 Create `bench/` with a git-ignored `bench/.venv`. Install GuideLLM 0.7.x there with CPU-only torch, and verify `guidellm run --help` lists the `openai_http` backend and the `concurrent` profile. Also verify `git status` shows no `.venv` files.
+- [x] 1.2 Write `bench/make_datasets.py`. It builds `bench/datasets/interactive.json` from the 12 coding and report prompts in `eval/tasks.md`, reusing the eval parser. Verify the file has exactly 12 entries, each prompt matches its source task text, and none contains `FORMAT EXAMPLE`.
+  - Implementation note: the 12 unique prompts are cycled 20 times (240 records), because GuideLLM stops a run when its dataset is exhausted. Verified: 240 records, each identical to its source task, 12 unique.
+- [x] 1.3 Write `bench/run.sh`, which runs one named workload (`interactive`, `agent`) at one concurrency level.
   - It reads the proxy token from `.env` at run time and passes it to GuideLLM's backend.
   - It applies the warmup/cooldown, `max(20, 3×N)` completions and 4-minute cap from design.md.
   - It writes to `bench/results/<date>/<workload>-<N>.json`.
   - Verify: a run against the local mock server produces the output file, and the dummy key used for the test appears nowhere in it.
-- [ ] 1.4 Write `bench/metrics_sampler.py`. It polls vLLM's `/metrics` every 5 s through the authenticated URL and writes timestamped CSV rows for requests running, requests waiting, KV-cache use and preemptions, finding metric names by pattern, not hard-coding them. Verify it parses a saved Prometheus-format text sample correctly and keeps running, logging the gap, when a metric is missing or a poll fails.
-- [ ] 1.5 Write `bench/summarize.py`. For each level it reads GuideLLM's output plus the sampler CSV and prints:
+- [x] 1.4 Write `bench/metrics_sampler.py`. It polls vLLM's `/metrics` every 5 s through the authenticated URL and writes timestamped CSV rows for requests running, requests waiting, KV-cache use and preemptions, finding metric names by pattern, not hard-coding them. Verify it parses a saved Prometheus-format text sample correctly and keeps running, logging the gap, when a metric is missing or a poll fails.
+- [x] 1.5 Write `bench/summarize.py`. For each level it reads GuideLLM's output plus the sampler CSV and prints:
   - p50/p95 time to first token, time to first visible token, per-request generation speed and total time;
   - aggregate throughput, failed-request count and completed count;
   - peak running, waiting and KV use, and any preemptions.
 
   It then applies the "usable" targets from design.md and flags any level with fewer than 20 completions. Verify it produces a correct table from the mock-server runs made in 1.3.
-- [ ] 1.6 Write `bench/README.md`: install, build datasets, run a level, run the sampler alongside, summarize. Verify every command runs exactly as written against the mock server.
+- [x] 1.6 Write `bench/README.md`: install, build datasets, run a level, run the sampler alongside, summarize. Verify every command runs exactly as written against the mock server.
 
 ## 2. Multi-user configuration (free until a request arrives)
 
-- [ ] 2.1 In `deploy.py`, make both changes, each with a comment giving its reason and pointing to the accuracy re-check (task 3.3). Verify the file parses and `modal deploy` succeeds without starting a container (`modal container list` stays empty).
+- [x] 2.1 In `deploy.py`, make both changes, each with a comment giving its reason and pointing to the accuracy re-check (task 3.3). Verify the file parses and `modal deploy` succeeds without starting a container (`modal container list` stays empty).
   - Set `KV_CACHE_DTYPE = "fp8"`, rewriting the comment that explains the earlier BF16 choice.
   - Add `max_containers=1` to `serve()`, and update the `MAX_CONCURRENT_REQUESTS` comment, which currently warns that no limit exists.
 

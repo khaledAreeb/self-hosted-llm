@@ -39,3 +39,6 @@ models/
 # local on purpose; data residency is why this deployment exists.
 eval/docs/
 eval/images/
+
+# Load-test tooling (GuideLLM + CPU torch) lives in its own environment.
+bench/.venv/
