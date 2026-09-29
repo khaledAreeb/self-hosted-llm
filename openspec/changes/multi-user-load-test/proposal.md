@@ -46,7 +46,7 @@ question.
   - `KV_CACHE_DTYPE` changes to `fp8`, with a comment recording the accuracy re-check.
   - `max_containers=1` is added to `serve()`.
   - MTP is toggled temporarily for the comparison, then set to whichever wins.
-- **New `bench/` folder**: datasets built from the phase 2 eval prompts, the run commands, a `/metrics` recorder, results, `bench/FINDINGS.md` and a README.
+- **New `bench/` folder**: datasets built from the phase 2 eval prompts, the run commands, a `/metrics` recorder, results, `bench/FINDINGS.md`, a README, and `bench/GUIDE.md` (a step-by-step learning guide to the whole phase, added at the operator's request).
 - **New local dependency**: GuideLLM, in its own git-ignored virtual environment. It pulls in torch and transformers (installed CPU-only), a large download that stays out of the project's own code.
 - **Cost**: roughly $3–4 of GPU time (two to three cold starts plus about 40 minutes of load), under a **$4 ceiling** checked before each group. That leaves about $4 of the remaining ~$8.
 - **Users of the endpoint**: during test windows the endpoint will be slow for anyone else. The config change to FP8 applies to everyone afterwards.

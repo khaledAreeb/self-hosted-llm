@@ -31,6 +31,8 @@ the first real invoice.
 | 2026-09-28 | Group 5 gate (task 5.1) — after decode baseline, MTP test, `low` verification (three cold starts) | **$4.95 this phase** | **$11.20** | Modal dashboard |
 | 2026-09-28 | After the evaluation run (task 6.6) — two passes, repeats, one cold start | **$7.49 this phase** | **$8.66** | Modal dashboard |
 | 2026-09-29 | **Phase 3 start** and window-1 gate (task 3.1). Phase 3 ceiling $4, window 1 needs ~$2.80: pass | — | **$7.85** | Modal dashboard |
+| 2026-09-29 | Window-2 gate (task 5.1), after window 1 (~46 GPU-min). Phase 3 spent $2.23 of $4; window 2 needs ~$0.70: pass | **$2.23 this phase** | **$5.62** | Modal dashboard |
+| 2026-09-29 | After window 2 (MTP off, ~18 GPU-min), phase 3 complete | ~$3.10 this phase (estimate) | ~$4.75 (estimate, to confirm) | pending dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -740,6 +742,18 @@ through the gateway returned the right call with the right arguments.
 Balance $8.66 after the evaluation run: **$7.49 spent this phase against the
 $12 ceiling**, within a cent of the estimate. The LiteLLM check reused the
 still-warm container, so it cost its idle tail (~$0.50) and no cold start.
+
+### 2026-09-29 — Load test results: capacity 4 interactive, 8+ agents; MTP kept (groups 4-5)
+
+Full write-up in `bench/FINDINGS.md`. The facts worth having here:
+
+- **Interactive capacity is 4 simultaneous requests** at the pre-stated target (p95 first visible word ≤ 20 s). Level 8 misses it by 3.5 s, and both runs agree to 0.1 s. With a 25 s target, capacity would be 8.
+- **Up to 16 in flight, compute-bound:** 0 waiting, KV ≤ 29%, no preemptions. **At 30, 16 requests queue** with KV at 54%, so it is not memory. With MTP off, 14 still queue, so it is not MTP. The cause is unestablished; the suspect is `--max-num-batched-tokens`.
+- **Agents are within target through 8** (p95 step 15 s). The prefix cache served 81-85% of prompt tokens.
+- **One fresh 137K-token document stalls the room.** Other users' p95 first visible word went from 20.9 s to **100.2 s** during its read. The document itself: 86 s to first token, answered correctly.
+- **MTP under load:** at 8, visible p95 23.5 s (on) vs 42.6 s (off), and throughput 392-435 vs 247 tok/s. At 30, throughput 770 vs 633 and p95 about equal. Kept.
+- **Cold starts:** FP8 with MTP 653 s, FP8 without MTP 669 s. Both were first starts of a new config, so both were slow.
+- **User translation uses a binomial 95% rule,** not capacity divided by busy fraction. Capacity 4 serves ~10-20 chat users at a 20-10% busy fraction.
 
 ### 2026-09-29 — Run-to-run noise at 8 concurrent (task 4.2)
 

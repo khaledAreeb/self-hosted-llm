@@ -160,6 +160,14 @@ TOOL_CALL_PARSER = "qwen3_xml"
 # reasoning makes almost every request decode-heavy, and the prefix cache
 # removes prefill on repeat reads. To recover prefill speed, raise
 # --max-num-batched-tokens as vLLM itself suggests.
+# UNDER LOAD (phase 3, 2026-09-29, FP8 KV, same prompts, temperature 0):
+#     8 concurrent:  visible-word p95 23.5 s with MTP vs 42.6 s without;
+#                    generation 72-75 vs 40 tok/s; throughput 392-435 vs 247
+#     30 concurrent: generation 35 vs 29 tok/s; throughput 770 vs 633;
+#                    p95 about equal (66.8 vs 61.9 s)
+# Kept: the gain shrinks as the GPU fills, but it never reverses. Requests
+# still queued at 30 without MTP, so the 2,048-token cap above is not what
+# limits concurrency. See bench/FINDINGS.md.
 SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 
 # Share of the GPU's 80 GB that vLLM may claim for weights, activations and

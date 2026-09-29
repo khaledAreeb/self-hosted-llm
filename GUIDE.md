@@ -795,3 +795,29 @@ python3 eval/run_eval.py report-my-real-task
 A real document from your own work, with an answer you already know, is worth
 more than all 24 synthetic tasks. That is the next step this evaluation
 points to.
+
+---
+
+# Phase 3 — How many people can use it at once
+
+## Part 11 — Load testing, in one page
+
+Phases 1–2 sent one request at a time. Phase 3 kept **N requests in flight at
+once** and watched how the answers slowed down. The full step-by-step guide,
+with every command, is **`bench/GUIDE.md`**; the results are in
+`bench/FINDINGS.md`. The short version:
+
+| Question | How it was answered | Result |
+|---|---|---|
+| Is the tool measuring the right thing? | Ran GuideLLM and `decode_bench.py` on the same prompt | Generation speed within 0.5% |
+| Can the cheaper memory setting be trusted? | Re-ran the 6 long-document tasks on FP8 | 6/6 pass, and capacity doubles |
+| How many requests at once? | 1, 4, 8, 16 and 30 in flight, real prompts | **4** within a 20 s target |
+| Why does it slow down? | vLLM's own counters, every 5 s | Compute-bound up to 16; queueing at 30 |
+| Does MTP still help under load? | Same test with MTP off | Yes: 42.6 s → 23.5 s at 8 |
+| How many people is that? | Binomial "95% of the time" rule | ~10–20 chat users; 8 agents |
+
+Three lessons carry over to any model:
+
+1. **Decide what "usable" means before you look.** Otherwise you will choose the target that makes the result look good.
+2. **Requests are not users.** People are busy only part of the time, and their requests cluster. Size for the bursts, not the average.
+3. **Test the tool before trusting it.** GuideLLM had four rough edges in its current version. The worst was its warmup: the default setting threw away every request (all zeros), and the alternative threw away none. They were caught by running it against its own mock server first, for $0.
