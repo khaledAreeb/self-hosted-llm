@@ -182,7 +182,6 @@ first-visible-word wait goes from about 15 s toward the 24 s seen at 8.
 |---|---|---|
 | Phase 3 start | $7.85 | — |
 | After window 1 (FP8 re-check, validation, load runs) | $5.62 | $2.23 |
-| After window 2 (MTP off; ~18 GPU-minutes) | ~$4.75, *estimated* | ~$3.10 |
+| After window 2 (MTP off; ~18 GPU-minutes) | **$4.81** (dashboard, 2026-09-30) | **$3.04** |
 
-The ceiling was $4. The final figure is to be confirmed from the dashboard
-(task 6.3).
+The ceiling was $4. Final figure confirmed from the dashboard (task 6.3).

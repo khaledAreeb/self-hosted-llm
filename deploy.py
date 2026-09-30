@@ -50,6 +50,23 @@ MODEL_ID = "Qwen/Qwen3.8-27B-FP8"
 # L40S (48 GiB) also fits on paper, but at 0.90 utilization its budget is
 # 43.2 GiB against a 42.4 GiB requirement -- only 0.8 GiB of margin.
 # A100-80GB has ~29.6 GiB of margin and ~2x the memory bandwidth.
+#
+# H100 was TRIED on 2026-09-30 and reverted. The case for it: this checkpoint
+# and the KV cache are FP8, the A100 has no FP8 hardware (hence the "Marlin"
+# conversion above), and the H100 computes in FP8 directly.
+#
+# What happened: every start crash-looped with
+#     RuntimeError: ... NVCC version must be at least 12.9
+# On Hopper, vLLM switches FP8 matrix maths to DeepGEMM, which compiles
+# kernels at startup and needs CUDA 12.9. This image is cuda:12.8.1, which
+# the A100 never exposed because it never uses DeepGEMM. Two containers
+# loaded, crashed and retried until the app was stopped: ~$1.80, no answer.
+#
+# To try again: raise the image to nvidia/cuda:12.9.1-devel-ubuntu22.04, or set
+# VLLM_USE_DEEP_GEMM=0 in the image env; set GPU = "H100!" ("!" pins a real
+# H100 -- Modal accepted it); then measure with bench/h100_test.sh against
+# the A100 results in bench/results/2026-09-29/ before relying on it.
+# Cost: ~$4.39/hr all-in vs ~$2.94/hr for the A100.
 GPU = "A100-80GB"
 
 # Native context is 262,144 tokens. Left at the default, vLLM reserves KV
@@ -177,19 +194,24 @@ SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 # and fragmentation; raising it gains little and risks OOM at startup.
 GPU_MEMORY_UTILIZATION = 0.90
 
-# Release the GPU after 10 minutes idle.
+# Release the GPU after 5 minutes idle.
 #
-# Raised from 5 to 10 minutes on 2026-09-27 (commit a27b967); the reason was
-# not recorded. The trade: each extra idle minute costs ~$0.05 (at ~$2.94/hr)
-# after every burst of use, in exchange for fewer cold starts when someone
-# comes back within the window. A cold start costs 5-12 minutes of GPU.
+# History: 5 minutes in phase 1, raised to 10 on 2026-09-27 (commit a27b967,
+# reason not recorded), back to 5 on 2026-09-30 by the operator to save
+# money. The trade: each idle minute costs ~$0.05 (at ~$2.94/hr) after every
+# burst of use; a shorter window means more cold starts (5-12 min of GPU)
+# when someone comes back just after it closed.
+#
+# WARNING: 5 minutes is the same as LiteLLM's default health-check interval
+# (300 s). Background health checks MUST stay off (README, "LiteLLM gateway
+# configuration") or the gateway keeps the GPU awake permanently.
 #
 # Modal's own example ships 15 minutes. For a bursty team that is ~90 min/day
 # of paid idle GPU -- about a third of the entire pilot budget, per day.
 #
 # Do NOT drop below ~2 minutes: a user who pauses 90 seconds to read an answer
 # would otherwise trigger a cold start in the middle of their conversation.
-IDLE_WINDOW_SECONDS = 10 * 60
+IDLE_WINDOW_SECONDS = 5 * 60
 
 # A 28 GB model takes minutes to load. Modal's default startup_timeout is 5
 # SECONDS, which would kill the container while it is starting normally.
