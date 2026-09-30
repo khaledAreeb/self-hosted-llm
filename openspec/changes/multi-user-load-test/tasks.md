@@ -67,7 +67,8 @@
 
   Verify every number cites a file in `bench/results/`.
 - [x] 6.2 Add the user table: capacity turned into people at a 10% and a 20% busy fraction for interactive users, and at 100% for agent users, with a mixed-team example and no single unconditional user count. Verify each figure shows its assumption.
-- [ ] 6.3 Record the final spend against the $4 ceiling from a dashboard reading, and add the measured facts to `NOTES.md` (cold start of the FP8 config, noise, knees, MTP result). Verify the spend table has a row for each gate.
+- [x] 6.3 Record the final spend against the $4 ceiling from a dashboard reading, and add the measured facts to `NOTES.md` (cold start of the FP8 config, noise, knees, MTP result). Verify the spend table has a row for each gate.
+  - Dashboard 2026-09-30: $4.81 after phase 3, so **phase 3 cost $3.04 against the $4 ceiling** (estimate was $3.10). Recorded in NOTES.md and bench/FINDINGS.md.
 - [x] 6.4 Write `bench/GUIDE.md`: a step-by-step learning guide to everything in phase 3, written for the operator so they can run and judge a load test themselves. It covers:
   - the mental model (concurrent requests vs users, the busy fraction, time to first visible token);
   - installing and validating the tool against a known benchmark, including the GuideLLM 0.7.4 pitfalls found (JSON split, `prefix_buckets`, warmup, the mock-server tokenizer);

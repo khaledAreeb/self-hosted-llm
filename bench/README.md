@@ -11,6 +11,7 @@ with the server's own counters, so every slowdown can be explained.
 | `run.sh` | runs **one level**: one workload at one concurrency |
 | `metrics_sampler.py` | records vLLM's `/metrics` every 5 s during a level (`run.sh` starts it for you) |
 | `summarize.py` | turns a results folder into one table per workload and judges each level |
+| `h100_test.sh` | measures an H100 deployment against the A100 results of 2026-09-29: key levels, GPU confirmed from the logs, GPU always released at the end (asks for your balance first, ~$2-2.50). **Not usable yet:** it needs `deploy.py` set to `H100!` *and* the CUDA 12.9 fix; see the GPU comment in `deploy.py` |
 | `tests/test_sampler.py` | checks the sampler with a fake server; no GPU needed |
 | `results/<date>/` | what each run wrote: `<label>.json`, `<label>.metrics.csv`, `<label>.log` |
 

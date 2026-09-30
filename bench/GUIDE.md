@@ -428,5 +428,5 @@ The obvious next experiment is the lever Parts 7 and 8 point to:
 |---|---|---|
 | Tooling, tests, docs | none (laptop + mock server) | $0 |
 | Window 1: FP8 re-check, validation, all load levels | ~46 min | $2.23 (dashboard) |
-| Window 2: MTP off at 8 and 30 | ~18 min | ~$0.87 (estimated) |
-| **Total** | | **~$3.10**, under the $4 ceiling |
+| Window 2: MTP off at 8 and 30, plus idle tail | ~18 min | $0.81 |
+| **Total** | | **$3.04** (dashboard), under the $4 ceiling |

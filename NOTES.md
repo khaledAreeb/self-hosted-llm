@@ -32,7 +32,8 @@ the first real invoice.
 | 2026-09-28 | After the evaluation run (task 6.6) — two passes, repeats, one cold start | **$7.49 this phase** | **$8.66** | Modal dashboard |
 | 2026-09-29 | **Phase 3 start** and window-1 gate (task 3.1). Phase 3 ceiling $4, window 1 needs ~$2.80: pass | — | **$7.85** | Modal dashboard |
 | 2026-09-29 | Window-2 gate (task 5.1), after window 1 (~46 GPU-min). Phase 3 spent $2.23 of $4; window 2 needs ~$0.70: pass | **$2.23 this phase** | **$5.62** | Modal dashboard |
-| 2026-09-29 | After window 2 (MTP off, ~18 GPU-min), phase 3 complete | ~$3.10 this phase (estimate) | ~$4.75 (estimate, to confirm) | pending dashboard |
+| 2026-09-30 | **Phase 3 final** (task 6.3): window 2 plus the idle tail, confirmed | **$3.04 this phase** | **$4.81** | Modal dashboard |
+| 2026-09-30 | H100 attempt crash-looped (CUDA 12.9 needed); app stopped | **$1.79** | **$3.02** | Modal dashboard |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -742,6 +743,31 @@ through the gateway returned the right call with the right arguments.
 Balance $8.66 after the evaluation run: **$7.49 spent this phase against the
 $12 ceiling**, within a cent of the estimate. The LiteLLM check reused the
 still-warm container, so it cost its idle tail (~$0.50) and no cold start.
+
+### 2026-09-30 — H100 attempt: crash-looped at startup, reverted to A100
+
+`GPU = "H100!"` was deployed (Modal accepted the "!" pin). The first request,
+from OpenCode/Copilot through the hosted gateway, started a container that
+loaded the model and then died in `load_model`:
+
+```
+RuntimeError: Assertion error (.../deep_jit/backend/cuda/backend.hpp:72):
+major > 12 or (major == 12 and minor >= 9): NVCC version must be at least 12.9
+```
+
+On Hopper, vLLM routes FP8 block-scaled matrix maths to **DeepGEMM**, which
+JIT-compiles with NVCC at startup and needs CUDA 12.9. The image is
+`nvidia/cuda:12.8.1-devel`. On the A100 vLLM uses Marlin instead, so three
+phases never touched DeepGEMM. Modal retried: two containers, 7 queued calls,
+**$1.79 spent**, no answer. Stopped with `modal app stop`; `deploy.py` is back
+on `A100-80GB`.
+
+This is the same lesson as the `bf16` flag, the GPU string and the CUDA tag: a
+setting is verified only once it runs on that hardware. **A GPU change is a new
+configuration**, not a one-line swap, and it needs the same test window as
+any other change. The fix (CUDA 12.9 image, or `VLLM_USE_DEEP_GEMM=0`) is
+recorded above `GPU` in `deploy.py`; `bench/h100_test.sh` is the measuring
+run for when it is applied.
 
 ### 2026-09-29 — Load test results: capacity 4 interactive, 8+ agents; MTP kept (groups 4-5)
 
