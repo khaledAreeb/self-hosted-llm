@@ -1,0 +1,17 @@
+{
+  "code-sql-top-customers@shadeform": {
+    "area": "coding",
+    "effort": "default",
+    "via": "http://154.54.100.46:8000/v1/chat/completions",
+    "max_tokens": 4000,
+    "prompt_tokens": 258,
+    "completion_tokens": 591,
+    "reasoning_tokens": 445,
+    "ttft_s": 3.2,
+    "total_s": 9.3,
+    "finish_reason": "stop",
+    "answer_words": 58,
+    "empty_answer": false,
+    "truncated": false
+  }
+}

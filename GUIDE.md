@@ -10,7 +10,9 @@ broken. Those sections matter more than the happy path.
 
 Parts 1-7 cover getting it running (phase 1). Parts 8-10 cover judging it
 (phase 2): **how to measure speed yourself** (Part 9) and **how to know whether
-the model's answers are correct** (Part 10).
+the model's answers are correct** (Part 10). Part 11 covers load testing
+(phase 3), and Part 12 running the same model on a rented VM instead of
+Modal (phase 4).
 
 ---
 
@@ -821,3 +823,74 @@ Three lessons carry over to any model:
 1. **Decide what "usable" means before you look.** Otherwise you will choose the target that makes the result look good.
 2. **Requests are not users.** People are busy only part of the time, and their requests cluster. Size for the bursts, not the average.
 3. **Test the tool before trusting it.** GuideLLM had four rough edges in its current version. The worst was its warmup: the default setting threw away every request (all zeros), and the alternative threw away none. They were caught by running it against its own mock server first, for $0.
+
+---
+
+# Phase 4 — Running it on a rented VM
+
+## Part 12 — Moving off Modal: running it on rented VMs
+
+Modal is serverless: it starts a container when a request arrives and stops it
+when the GPU sits idle. Shadeform rents you **a whole VM** from one of many GPU
+providers, at about half the hourly price ($1.38/hr for an A100 against
+~$2.94/hr on Modal). The model and the vLLM flags are identical: they were
+checked flag for flag against `deploy.py`. What changes is everything *around*
+the model. The tool is `shadeform_deploy.py`, and the commands are in the
+README's "Shadeform" section.
+
+### What Modal did for us that we now do ourselves
+
+| Modal did it for us | On a rented VM | What `shadeform_deploy.py` does |
+|---|---|---|
+| HTTPS at its edge | plain HTTP, every port open | `--https`: a self-signed certificate, and a firewall leaving only SSH and 8443 open |
+| Checked the token at its edge | anyone can reach the port | vLLM checks its own key (`VLLM_API_KEY`); `up` confirms that a request without it is refused |
+| Scale-to-zero after 5 idle minutes | **bills every minute until deleted** | a required `--hours`, Shadeform's auto-delete, `reap`, and `down` |
+| A stable URL | a new IP on every `up` | prints the API Base to paste into the gateway |
+| Ran the CUDA version our image chose | the **host's driver** must support the container's CUDA | `offers` lists only hosts with a CUDA 13+ image, because the container is CUDA 13 |
+| Kept the weights in a Volume | nothing survives the VM | downloads 28 GB on every start (accepted for now) |
+
+The CUDA row is the H100 lesson from phase 3 seen from the other side. On
+Modal, our own image was too old for what vLLM wanted on Hopper. Here, the
+container is fixed and the risk is a host driver too old for it. `offers`
+lists those hosts as "not usable", with the reason, even when they look cheaper.
+
+### One command up, one command down
+
+```bash
+python3 shadeform_deploy.py offers             # free: what can run it now, and the price
+python3 shadeform_deploy.py up --hours 1       # paid from here; finishes when the model answers
+python3 shadeform_deploy.py status             # free: what is running, cost so far, time left
+python3 shadeform_deploy.py down               # billing stops, confirmed by Shadeform
+```
+
+The habit that matters: **every `up` gets a `down`.** The deadline is there for
+the day you forget, not as the plan. Three things catch a forgotten VM:
+- **Shadeform's auto-delete** at the deadline;
+- **`reap`** on a 15-minute schedule;
+- **`up` deleting the VM itself** if the start fails or you press Ctrl-C.
+
+Use **`up --hours 1 --https`** before any company data goes through it.
+
+### Which is cheaper depends on how busy the open hours are
+
+Modal charges more per hour, but only while it's working, plus 5 idle minutes
+after each burst. Shadeform charges less per hour, but for **every hour the VM
+is open**, busy or not, plus a paid 15–25 minute start. A rough rule:
+**Shadeform is cheaper once the GPU is busy for more than about half the hours
+it's open** ($1.38 ÷ $2.94 ≈ 47%).
+- **A team working through a whole day** favours Shadeform.
+- **A few questions spread across the day** favour Modal.
+
+### Three lessons that carry over
+
+1. **Read the API reference, not only the guides.** Shadeform's guides never mention auto-delete, and the first plan was built on "there is none". The reference page for creating an instance lists it, with a date limit and a spend limit. `reap` stays as a backup until auto-delete is seen working on a real VM.
+2. **Don't let a system you can't see split your arguments.** Shadeform's Docker launch takes all of vLLM's arguments as one text string, and two of ours are JSON with spaces in them. The tool instead writes its own startup script, with every argument quoted by Python. That script can be run on the laptop with fake `docker`, `ufw` and `openssl` commands, which proves exactly what vLLM will receive, for $0.
+3. **Test the failure paths before paying for the happy one.** A fake Shadeform API and a fake vLLM cover every way a start can go wrong, and each one must end with the VM deleted:
+   - no capacity;
+   - a model that never answers;
+   - Ctrl-C, and a kill;
+   - a VM error;
+   - an endpoint that answers without the key;
+   - a port that should be closed but isn't.
+
+   The first paid start then only has to confirm what the fakes can't: the real provider, driver and network.
