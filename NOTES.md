@@ -35,6 +35,21 @@ the first real invoice.
 | 2026-09-30 | **Phase 3 final** (task 6.3): window 2 plus the idle tail, confirmed | **$3.04 this phase** | **$4.81** | Modal dashboard |
 | 2026-09-30 | H100 attempt crash-looped (CUDA 12.9 needed); app stopped | **$1.79** | **$3.02** | Modal dashboard |
 
+### Shadeform spend (phase 4)
+
+This is a separate budget: company credit in the shared "Areeb Technology"
+workspace, with a **$5 ceiling** for phase 4. The Modal balance above is not
+used.
+
+| Date | Activity | Cost | Balance after | Source |
+|---|---|---|---|---|
+| 2026-10-01 | **Phase 4 start** (task 6.1). `offers` shows usable A100s at $1.38/hr (MassedCompute, 3 US regions); stage A approved | — | **$42.62** | operator, from the Shadeform dashboard |
+| 2026-10-01 | Stage A VM, 10:30–11:02 UTC (32 min): start, checks, eval, then `down` | **$0.68** | ~$41.94 (to confirm on the dashboard, task 6.6) | Shadeform's final `cost_estimate`, $0.677 |
+| 2026-10-01 | Operator's VM, 11:09–11:30 UTC (A100): gateway setup; the first connection test failed while the model was still starting | **$0.44** | ~$41.50 | Shadeform's final `cost_estimate` |
+| 2026-10-01 | Operator's VM, 11:44–12:38 UTC (A100, via `--gpu A100`): gateway validated by the operator | **$1.20** | ~$40.31 | Shadeform's final `cost_estimate` |
+| 2026-10-01 | Stage B VM, 12:46–13:27 UTC (A100, `--https`): HTTPS, firewall, gateway via the vLLM provider; then `down` | **$0.88** | ~$39.43 | Shadeform's final `cost_estimate` |
+| 2026-10-01 | **Phase 4 total: $3.19 of the $5 ceiling**, 4 VMs, none left running | | **~$39.43** (dashboard confirmation pending, task 6.6) | sum of the four |
+
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
 original budget can no longer fund both this evaluation and the pilot**.
@@ -894,6 +909,48 @@ worth stating plainly: **confirming a flag is present is not confirming it is
 valid.** Where a value comes from documentation rather than from a local API,
 the first deploy is the test, and its failure should be expected rather than
 treated as a surprise.
+
+## Phase 4: running it on Shadeform VMs (2026-10-01)
+
+Tool: `shadeform_deploy.py` (standalone, standard library only). Every figure
+below was measured on 2026-10-01 on MassedCompute `A100_sxm4_80G_DGX`
+(Beltsville), at $1.38/hr.
+
+**Start time, `up` to READY: 14m58s (stage A) and 15m05s (stage B)**; the
+operator's two runs took about 14 minutes.
+
+| Step | Measured (stage A) |
+|---|---|
+| Create → VM `active` | 2m50s |
+| Startup script → 8.7 GB image pulled | 2m06s |
+| 28 GB model download | ~4.5 min (162 s on a later VM) |
+| vLLM start: weights, 47 s compile, KV cache, warmup | ~4 min |
+
+**Cost.**
+- **A start costs about $0.34** (15 min at $1.38/hr).
+- **Per hour:** $1.38, against ~$2.94 all-in for Modal's A100-80GB, so 47%. But a VM bills every open minute, while Modal bills only busy time plus a 5-minute idle tail. Shadeform is cheaper once the GPU is busy for more than about half the hours it's open.
+- **Phase total:** $3.19 for 4 VMs.
+
+**Same model, same speed.**
+- **Decode:** 77.5 tok/s (`eval/decode_bench.py`), against 73.2 on Modal with the same FP8 KV cache (phase 3).
+- **Correctness:** `code-sql-top-customers` PASS; tool calls return structured `tool_calls`.
+- **KV cache:** 38.33 GiB = **1,072,674 tokens**, 4.29 full 250K requests at once. This is the first time the pool was actually logged; Modal's figure (~1.4M) was only ever a calculation.
+- **MTP:** mean acceptance length 2.39–2.45 on short `low`-effort answers. Phase 2 saw 3.18 on long reasoning text: acceptance depends on the text.
+
+**Stage A (plain HTTP):** works end to end, through the gateway and the clients. A request without the key is refused (401).
+
+**Stage B (HTTPS + UFW):**
+- HTTPS only; plain HTTP refused; port 8000 closed; the certificate fingerprint matched the VM's own log.
+- The gateway works only through LiteLLM's **vLLM provider** (`hosted_vllm/`) with `ssl_verify: false`.
+
+**Provider surprises, each now handled or documented:**
+- **Auto-delete exists,** in the API reference but not in the guides. Shadeform accepts and echoes `auto_delete`. **It has not yet been seen firing:** all 4 VMs were deleted by `down` before their deadline, so `reap` stays as the backup.
+- **MassedCompute's image already allowed port 80** in UFW, and `rpcbind` listens publicly on 111. So stage A exposes more than vLLM. The script now runs `ufw --force reset` before adding its rules.
+- **LiteLLM's `openai` provider ignores a per-model `ssl_verify`.** The gateway hung up after the TLS hello, and 0 requests reached vLLM. Use the vLLM provider.
+- **The same public IP can come back on a later VM** (154.54.100.38 twice), so SSH warns that the host key changed.
+- **Without `--ssh-key-id`,** Shadeform installs the account's default key, and the VM can't be read over SSH.
+- **`/info` of a deleted instance answers 200 with `status: deleted`,** not 404.
+- **The gateway's Test Connect fails until READY,** because vLLM isn't listening yet. Start the VM about 15 minutes before it's needed.
 
 ## Open items
 
