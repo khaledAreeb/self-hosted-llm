@@ -256,8 +256,9 @@ but run older NVIDIA drivers, which can't start the pinned vLLM container.
 - **Filters:**
   - `--gpu H100` matches any part of the GPU or instance type, to pick a stronger GPU than the cheapest;
   - `--region france` matches any part of the region name;
-  - `--cloud massedcompute` matches the provider exactly.
-- **Applies to `up` too:** both flags work there as well.
+  - `--cloud massedcompute` matches the provider exactly;
+  - `--tensor-parallel 2` lists VMs with exactly 2 GPUs instead of 1 (see [Two GPUs on one VM](#two-gpus-on-one-vm-tensor-parallelism)).
+- **Applies to `up` too:** all these flags work there as well.
 
 **`up`** (PAID from the moment the VM is created) shows the plan, asks before
 creating, and finishes only when the model has answered a real question:
@@ -306,6 +307,37 @@ gateway server. That machine needs only this file and a `.env` with
 ```
 */15 * * * * cd /opt/deploy-llm && /usr/bin/python3 shadeform_deploy.py reap >> reap.log 2>&1
 ```
+
+### Two GPUs on one VM (tensor parallelism)
+
+**Optional, and off by default.** Without `--tensor-parallel`, nothing
+changes: one GPU, exactly the setup measured in phases 1–4. With it, `up`
+rents a VM with exactly that many GPUs and vLLM splits the model across them
+(`--tensor-parallel-size`):
+```bash
+python3 shadeform_deploy.py offers --tensor-parallel 2                  # free: 2-GPU VMs, whole-VM price
+python3 shadeform_deploy.py up --hours 1 --tensor-parallel 2 --gpu A100 # PAID: one VM, model on both GPUs
+```
+- **Live today (2026-10-04):** MassedCompute 2x A100 80GB at $2.70/hr (twice one A100), and Scaleway 2x H100 at $6.60/hr. Both are linked by **PCIe, no NVLink**. The `offers` listing and the READY output show the link.
+- **Always add `--gpu A100`** (or the type you mean). If the first offer has no capacity, `up` tries the next cheapest **2-GPU** offer, which today is the $6.60 H100 pair.
+- **Each GPU must have 80 GB or more,** the same rule as one GPU, so the cheap 48 GB pairs are not offered.
+- **The other guarantees are unchanged:** the deadline and spend cap (priced for the whole VM), the key, `--https`, deletion on failure, `down`, `reap`.
+
+**Measured on 2026-10-04: not worth it on today's offers.** The only usable
+pair (MassedCompute 2x A100, PCIe through the CPU, no GPU peer-to-peer) was
+compared with one A100:
+
+| | 1x A100, $1.38/hr | 2x A100 tensor parallel, $2.70/hr |
+|---|---|---|
+| 8 people at once: first word p50 / p95 | **13.3 / 23.6 s** | 20.8 / 35.0 s |
+| 8 people at once: writing speed | **75 / 66 tok/s** | 49 / 43 tok/s |
+| one person alone | 77.5 tok/s | 82.9 tok/s |
+| KV cache room | 1.07M tokens | **2.93M tokens** |
+
+- **Two GPUs were slower for 8 people at once,** at twice the price, because without a direct link between them every token's work crosses the CPU.
+- **The only gain** is room for many very long prompts at once.
+- **To serve more people,** prefer two single-GPU VMs behind the gateway (`up` twice, the same public name). A pair with NVLink might change the result; none was offered.
+- **Details:** `NOTES.md`, "Phase 5".
 
 ### Stage A and stage B
 
@@ -357,15 +389,16 @@ unhealthy. That's expected.
 
 ### What a start costs, and how long it takes
 
-**Estimated, until the first paid run measures it:** 15–25 minutes from
-`up` to READY:
-- the VM boots in 5–10 minutes;
-- the 8.7 GB container downloads;
-- the 28 GB model downloads, every time, because nothing is kept between VMs;
-- vLLM starts.
+**Measured on 2026-10-01, on one A100: about 15 minutes from `up` to READY**
+(details in `NOTES.md`):
+- the VM boots in about 3 minutes;
+- the 8.7 GB container downloads in about 2;
+- the 28 GB model downloads in 3–4.5, every time, because nothing is kept between VMs;
+- vLLM starts in about 4.
 
-You pay for those minutes: about $0.35–0.60 per start on the $1.38/hr A100.
-Measured numbers will go in `NOTES.md`.
+You pay for those minutes: about $0.34 per start on the $1.38/hr A100. A
+2-GPU start took 11.5 minutes from active to READY, but the provider took 10
+minutes to start that VM (not billed).
 
 ### If a start fails
 
@@ -377,12 +410,15 @@ ssh shadeform@<ip> 'sudo docker logs -f qwen38'      # vLLM itself
 ssh shadeform@<ip> 'sudo journalctl -u init-script'  # Shadeform's view of the script
 ```
 - **`FATAL: driver ... too old`:** the host can't run the CUDA 13 image. `offers` should have excluded it, so report it.
+- **`Shadeform's VM has 1 GPU(s), 2 were requested`** (with `--tensor-parallel`): Shadeform handed over a different machine. `up` deletes it at once, seconds after creating it.
+- **`FATAL: 2 GPUs requested, 1 found`** in `start.log`: the VM itself shows fewer GPUs than it should. vLLM never starts, and `up` deletes the VM at its start limit.
+- **How the GPUs are linked:** with `--tensor-parallel`, `start.log` holds the output of `nvidia-smi topo -m` (`NV#` means NVLink; `PHB`, `PXB` or `SYS` mean PCIe).
 - **The container keeps restarting:** read `docker logs`. On Modal, the H100 failed exactly like this.
 
 ### Tests (free)
 
 ```bash
 python3 tests/test_shadeform_offers.py      # offer filtering, from a saved sample
-python3 tests/test_shadeform_script.py      # the VM's startup script, run with fake docker/ufw
+python3 tests/test_shadeform_script.py      # the VM's startup script for 1 and 2 GPUs, run with fake docker/ufw/nvidia-smi
 python3 tests/test_shadeform_lifecycle.py   # every command against a fake Shadeform API and vLLM
 ```

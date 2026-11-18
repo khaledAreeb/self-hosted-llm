@@ -81,9 +81,12 @@ SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 VLLM_IMAGE = "vllm/vllm-openai:v0.30.0"
 
 
-def vllm_flags():
-    """The vLLM flags after the model name, without host and port."""
-    return [
+def vllm_flags(tensor_parallel=1):
+    """The vLLM flags after the model name, without host and port.
+
+    For more than one GPU the split is appended at the end, so the shared part
+    stays exactly as checked against deploy.py; for one GPU nothing changes."""
+    flags = [
         "--max-model-len", str(MAX_MODEL_LEN),
         "--kv-cache-dtype", KV_CACHE_DTYPE,
         "--gpu-memory-utilization", str(GPU_MEMORY_UTILIZATION),
@@ -93,6 +96,9 @@ def vllm_flags():
         "--tool-call-parser", TOOL_CALL_PARSER,
         "--speculative-config", SPECULATIVE_CONFIG,
     ]
+    if tensor_parallel > 1:
+        flags += ["--tensor-parallel-size", str(tensor_parallel)]
+    return flags
 
 
 # ---------------------------------------------------------------------------
@@ -100,8 +106,13 @@ def vllm_flags():
 # ---------------------------------------------------------------------------
 
 # 28.9 GiB of weights plus KV cache for 250K context; the A100-80GB is what
-# phases 1-3 measured.
+# phases 1-3 measured. Applies to every GPU, also when the model is split.
 MIN_GPU_MEMORY_GB = 80
+
+# --tensor-parallel: how many GPUs of one VM the model is split across. vLLM
+# needs the split to divide the attention heads evenly; powers of two are the
+# safe set. Only 1 (the default, unchanged) and 2 have been tested.
+TENSOR_PARALLEL_CHOICES = (1, 2, 4, 8)
 
 # The image's CUDA version. A host whose driver predates it cannot run the
 # container, and a failed start costs money and 15+ minutes.
@@ -331,18 +342,18 @@ def host_cuda(os_name):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def split_offers(types, regions=None, clouds=None, gpus=None):
+def split_offers(types, regions=None, clouds=None, gpus=None, tensor_parallel=1):
     """Turns /instances/types into (usable, not_usable) rows, cheapest first.
 
-    Only single-GPU, 80 GB+, on-demand offers available now appear at all, one
-    row per available region. A row is usable when one of its OS images ships
+    Only offers with exactly `tensor_parallel` GPUs (1 unless asked), each 80 GB+,
+    on-demand and available now, appear at all, one row per available region. A row is usable when one of its OS images ships
     a CUDA 13.0+ driver; otherwise it is listed as not usable, with the reason.
     `regions` match any part of the region name; `clouds` match exactly;
     `gpus` match any part of the GPU or instance type, e.g. H100 or A100."""
     usable, not_usable = [], []
     for t in types:
         conf = t.get("configuration") or {}
-        if conf.get("num_gpus") != 1 or (conf.get("vram_per_gpu_in_gb") or 0) < MIN_GPU_MEMORY_GB:
+        if conf.get("num_gpus") != tensor_parallel or (conf.get("vram_per_gpu_in_gb") or 0) < MIN_GPU_MEMORY_GB:
             continue
         if clouds and t.get("cloud") not in clouds:
             continue
@@ -366,6 +377,8 @@ def split_offers(types, regions=None, clouds=None, gpus=None):
                 "vram_gb": conf.get("vram_per_gpu_in_gb"),
                 "price_cents": t.get("hourly_price"),
                 "os": best[2] if best else None,
+                "num_gpus": conf.get("num_gpus"),
+                "link": link_text(conf),
             }
             if best and best[0] >= MIN_HOST_CUDA:
                 usable.append(row)
@@ -379,6 +392,20 @@ def split_offers(types, regions=None, clouds=None, gpus=None):
     return sorted(usable, key=order), sorted(not_usable, key=order)
 
 
+def link_text(conf):
+    """How the GPUs of an offer are connected, as Shadeform describes it."""
+    if conf.get("nvlink"):
+        return "NVLink"
+    link = {"pcie": "PCIe"}.get(conf.get("interconnect"), conf.get("interconnect") or "unknown link")
+    return "%s, no NVLink" % link
+
+
+def gpu_summary(offer, tensor_parallel):
+    """e.g. '2 x A100_80G (80 GB each), tensor parallel 2, link: PCIe, no NVLink (per Shadeform)'."""
+    return "%d x %s (%d GB each), tensor parallel %d, link: %s (per Shadeform)" % (
+        offer["num_gpus"], offer["gpu"], offer["vram_gb"], tensor_parallel, offer["link"])
+
+
 def fetch_types(key=None):
     status, body = api("GET", "/instances/types", key)
     check_auth(status)
@@ -387,9 +414,13 @@ def fetch_types(key=None):
     return body.get("instance_types") or []
 
 
-def _offer_line(r, last):
-    return "  %6.2f  %-18s %-15s %-18s %s" % (
+def _offer_line(r, last, link=False):
+    line = "  %6.2f  %-18s %-15s %-18s %s" % (
         r["price_cents"] / 100.0, r["instance_type"], r["cloud"], r["region"], last)
+    if link:            # multi-GPU listings only; the one-GPU listing keeps its columns
+        line = "  %6.2f  %-18s %-15s %-18s %-17s %s" % (
+            r["price_cents"] / 100.0, r["instance_type"], r["cloud"], r["region"], r["link"], last)
+    return line
 
 
 def _filters(args):
@@ -401,19 +432,26 @@ def _filters(args):
 
 def cmd_offers(args):
     regions, clouds, gpus = _filters(args)
-    usable, not_usable = split_offers(fetch_types(secret("SHADEFORM_API_KEY")), regions, clouds, gpus)
+    tp = args.tensor_parallel
+    usable, not_usable = split_offers(fetch_types(secret("SHADEFORM_API_KEY")), regions, clouds, gpus, tp)
     cuda = "%d.%d" % MIN_HOST_CUDA
-    say("Usable now (1 GPU, %d GB+, host CUDA %s+), cheapest first:" % (MIN_GPU_MEMORY_GB, cuda))
-    say("    $/hr  %-18s %-15s %-18s %s" % ("type", "provider", "region", "OS image"))
+    multi = tp > 1
+    if multi:
+        say("Usable now (%d GPUs on one VM, %d GB+ each, host CUDA %s+; price for the whole VM), "
+            "cheapest first:" % (tp, MIN_GPU_MEMORY_GB, cuda))
+        say("    $/hr  %-18s %-15s %-18s %-17s %s" % ("type", "provider", "region", "link", "OS image"))
+    else:
+        say("Usable now (1 GPU, %d GB+, host CUDA %s+), cheapest first:" % (MIN_GPU_MEMORY_GB, cuda))
+        say("    $/hr  %-18s %-15s %-18s %s" % ("type", "provider", "region", "OS image"))
     for r in usable:
-        say(_offer_line(r, r["os"]))
+        say(_offer_line(r, r["os"], multi))
     if not usable:
         say("  (none right now; `up` would create nothing)")
     if not_usable:
         say()
         say("Not usable (the %s image needs a CUDA %s+ host driver):" % (VLLM_IMAGE, cuda))
         for r in not_usable:
-            say(_offer_line(r, r["reason"]))
+            say(_offer_line(r, r["reason"], multi))
     return 0
 
 
@@ -421,14 +459,17 @@ def cmd_offers(args):
 # The VM's startup script
 # ---------------------------------------------------------------------------
 
-def startup_script(api_key, https=False):
+def startup_script(api_key, https=False, tensor_parallel=1):
     """The bash script Shadeform runs once the VM is active. It starts the
     pinned vLLM container with the settings above; with https it also makes a
-    self-signed certificate and closes every port except SSH and 8443.
+    self-signed certificate and closes every port except SSH and 8443. With
+    tensor_parallel > 1 it checks the GPU count, logs how the GPUs are linked,
+    and splits the model; with 1 the script is exactly the single-GPU one.
 
     Every vLLM argument is quoted here, so JSON values reach vLLM intact."""
     port = HTTPS_PORT if https else HTTP_PORT
-    serve = [MODEL_ID, "--host", "0.0.0.0", "--port", str(port)] + vllm_flags()
+    multi = tensor_parallel > 1
+    serve = [MODEL_ID, "--host", "0.0.0.0", "--port", str(port)] + vllm_flags(tensor_parallel)
     if https:
         serve += ["--ssl-keyfile", "/tls/key.pem", "--ssl-certfile", "/tls/cert.pem"]
     q = shlex.quote
@@ -445,8 +486,9 @@ def startup_script(api_key, https=False):
         'exec > >(tee -a "$LOG") 2>&1',
         'step() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }',
         "trap 'step \"FATAL: line $LINENO failed with status $?\"' ERR",
-        "step %s" % q("start: mode=%s port=%d image=%s" % (
-            "https" if https else "http", port, VLLM_IMAGE)),
+        "step %s" % q("start: mode=%s port=%d image=%s%s" % (
+            "https" if https else "http", port, VLLM_IMAGE,
+            " tensor_parallel=%d" % tensor_parallel if multi else "")),
         "",
         "# The image is CUDA 13.0: the host driver must be 580 or newer.",
         "nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader",
@@ -455,6 +497,20 @@ def startup_script(api_key, https=False):
         '  step "FATAL: driver $DRIVER is too old for the CUDA 13 image (needs 580+)"; exit 1',
         "fi",
         'df -h / "$DIR" || true',
+    ]
+    if multi:
+        lines += [
+            "",
+            "# Tensor parallel: the model is split across %d GPUs, so all of them must" % tensor_parallel,
+            "# be here. The topology shows how they are linked (PCIe, NVLink).",
+            'GPUS="$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)"',
+            'if [ "$GPUS" -lt %d ]; then' % tensor_parallel,
+            '  step "FATAL: %d GPUs requested, $GPUS found"; exit 1' % tensor_parallel,
+            "fi",
+            'step "GPUs: $GPUS, tensor parallel %d; topology:"' % tensor_parallel,
+            "nvidia-smi topo -m || true",
+        ]
+    lines += [
         "",
         "# The key vLLM requires, readable only by this user; docker reads it with --env-file.",
         'umask 077',
@@ -500,7 +556,10 @@ def startup_script(api_key, https=False):
         "$SUDO docker rm -f %s >/dev/null 2>&1 || true" % CONTAINER,
         "SERVE_ARGS=(%s)" % " ".join(q(a) for a in serve),
         'step "starting vLLM; the model (~28 GB) downloads on first start"',
-        "$SUDO docker run -d --name %s --restart on-failure:3 --gpus all --shm-size 16g \\" % CONTAINER,
+        # Tensor parallel workers exchange data through shared memory: vLLM's docs
+        # give --ipc=host for that. One GPU keeps the measured 16 GB.
+        "$SUDO docker run -d --name %s --restart on-failure:3 --gpus all %s \\" % (
+            CONTAINER, "--ipc=host" if multi else "--shm-size 16g"),
         "  -p %d:%d %s \\" % (port, port, " ".join(mounts)),
         '  --env-file "$DIR/vllm.env" -e HF_HUB_DISABLE_XET=1 \\',
         '  %s "${SERVE_ARGS[@]}"' % q(VLLM_IMAGE),
@@ -630,8 +689,10 @@ def fingerprint(der):
 class Start:
     """What `up` knows so far, for progress lines and the failure report."""
 
-    def __init__(self, iid, offer, https):
+    def __init__(self, iid, offer, https, tensor_parallel=1):
         self.iid, self.offer, self.https = iid, offer, https
+        self.tensor_parallel = tensor_parallel
+        self.gpus_checked = tensor_parallel == 1    # one GPU: no extra check, as before
         self.t0 = time.monotonic()
         self.stage = "creating the VM"
         self.ip = None
@@ -685,6 +746,14 @@ def wait_until_ready(key, start, api_key):
     while True:
         start.check_time()
         info = start.vm_state(key)
+        if info and not start.gpus_checked:
+            # The first /info after create already describes the machine: a VM with
+            # the wrong GPU count is deleted now, not after the 40-minute limit.
+            found = (info.get("configuration") or {}).get("num_gpus")
+            if found is not None and found != start.tensor_parallel:
+                raise Fail("Shadeform's VM has %s GPU(s), %d were requested"
+                           % (found, start.tensor_parallel))
+            start.gpus_checked = True
         if info:
             status = info.get("status") or "unknown"
             if status == "active" and info.get("ip"):
@@ -771,19 +840,26 @@ def cmd_up(args):
         raise Fail("--hours must be more than 0 and at most %d." % MAX_HOURS)
     key = shadeform_key()
     regions, clouds, gpus = _filters(args)
-    usable, not_usable = split_offers(fetch_types(key), regions, clouds, gpus)
+    tp = args.tensor_parallel
+    usable, not_usable = split_offers(fetch_types(key), regions, clouds, gpus, tp)
     if not usable:
         raise Fail("no usable offer right now%s (run `offers` to see why). Nothing was created."
-                   % (" for those filters" if regions or clouds or gpus else ""))
+                   % (" for those filters" if regions or clouds or gpus or tp > 1 else ""))
     api_key = vllm_key()
 
     deadline = deadline_after(hours)
     name = instance_name(deadline)
     offer = usable[0]
     say("Plan:")
-    say("  offer     %s %s %s (%s), %d GB GPU, $%.2f/hr" % (
-        offer["cloud"], offer["instance_type"], offer["region"], offer["where"], offer["vram_gb"],
-        offer["price_cents"] / 100.0))
+    if tp > 1:
+        say("  offer     %s %s %s (%s), $%.2f/hr for the whole VM" % (
+            offer["cloud"], offer["instance_type"], offer["region"], offer["where"],
+            offer["price_cents"] / 100.0))
+        say("  GPUs      %s" % gpu_summary(offer, tp))
+    else:
+        say("  offer     %s %s %s (%s), %d GB GPU, $%.2f/hr" % (
+            offer["cloud"], offer["instance_type"], offer["region"], offer["where"], offer["vram_gb"],
+            offer["price_cents"] / 100.0))
     if len(usable) > 1:
         say("            if it has no capacity: up to %d more offers, cheapest first"
             % (min(len(usable), MAX_CREATE_ATTEMPTS) - 1))
@@ -809,7 +885,7 @@ def cmd_up(args):
             say("Cancelled. Nothing was created.")
             return 1
 
-    script = startup_script(api_key, https=args.https)
+    script = startup_script(api_key, https=args.https, tensor_parallel=tp)
     for sig_name in ("SIGTERM", "SIGHUP"):     # treated like Ctrl-C: delete, then exit
         if hasattr(signal, sig_name):
             signal.signal(getattr(signal, sig_name), _raise_interrupt)
@@ -819,7 +895,7 @@ def cmd_up(args):
     finally:
         for sig, handler in saved.items():
             signal.signal(sig, handler)
-    start = Start(iid, offer, args.https)
+    start = Start(iid, offer, args.https, tp)
     say("Created %s (%s) on %s %s, $%.2f/hr." % (
         iid, name, offer["cloud"], offer["region"], offer["price_cents"] / 100.0))
     try:
@@ -844,6 +920,10 @@ def cmd_up(args):
     say("  VM        %s  %s %s, %s, $%.2f/hr" % (
         iid, offer["cloud"], offer["region"], offer["instance_type"], offer["price_cents"] / 100.0))
     say("  deadline  %s, then Shadeform deletes it" % deadline.strftime("%Y-%m-%d %H:%M UTC"))
+    if tp > 1:
+        say("  GPUs      %s" % gpu_summary(offer, tp))
+        say("            all %d in use (vLLM refuses to start the split on fewer); topology in %s/start.log"
+            % (tp, VM_DIR))
     if not args.https:
         say("  mode      PLAIN HTTP, not encrypted: non-sensitive tests only")
     say()
@@ -968,6 +1048,10 @@ def build_parser():
                             "or instance type; repeat or comma-separate)")
         p.add_argument("--cloud", action="append", metavar="NAME",
                        help="only these providers, e.g. massedcompute (repeat or comma-separate)")
+        p.add_argument("--tensor-parallel", type=int, default=1, choices=TENSOR_PARALLEL_CHOICES,
+                       metavar="N",
+                       help="split the model across N GPUs of one VM (1, 2, 4 or 8; default 1, "
+                            "which is the normal single-GPU setup)")
 
     p = sub.add_parser("offers", help="free: list GPUs that can run the model, cheapest first")
     filters(p)

@@ -85,7 +85,8 @@
     - **The tool's checks, re-run with `curl`:** HTTPS without the key gave 401; plain HTTP to 8443 was refused; port 8000 was closed. The certificate fingerprint matched the one logged on the VM.
     - **Found:** MassedCompute's image already allowed port 80 in UFW. It was removed on the VM, and the script now runs `ufw --force reset` first.
     - **Found:** the gateway first rejected the certificate (a TCP capture showed it hanging up after the TLS hello; 0 requests reached vLLM), because LiteLLM's `openai` provider ignores a per-model `ssl_verify`. A new entry `Qwen3.8-27B-Shadeform-vllm` with provider **vLLM (`hosted_vllm`)** and `ssl_verify: false` worked: `35.211.252.138 POST /v1/chat/completions 200` in vLLM's log at ~13:24 UTC.
-- [ ] 6.6 Record the spend from the Shadeform dashboard against the $5 ceiling, and verify no instance is still running.
+- [x] 6.6 Record the spend from the Shadeform dashboard against the $5 ceiling, and verify no instance is still running.
+  - **Result:** the dashboard showed **$39.42** on 2026-10-04 (operator's screenshot, before phase 5 spent anything). That's $42.62 − $39.42 = **$3.20** for phase 4, against the $3.19 summed from Shadeform's `cost_estimate`. The estimates are accurate. Phase 4 is under its $5 ceiling, with no instance left running (`status` empty on 2026-10-01).
 
 ## 7. Close-out
 

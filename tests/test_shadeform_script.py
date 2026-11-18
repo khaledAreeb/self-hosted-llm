@@ -35,9 +35,17 @@ if name == "sudo":
 with open(os.environ["FAKE_CALLS"], "a") as f:
     f.write(json.dumps({"cmd": name, "args": args}) + "\n")
 driver = os.environ.get("FAKE_DRIVER", "580.82.07")
-if name == "nvidia-smi":
-    print(driver if "--query-gpu=driver_version" in args else
-          "NVIDIA A100-SXM4-80GB, %s, 81920 MiB" % driver)
+gpus = int(os.environ.get("FAKE_GPUS", "1"))
+if name == "nvidia-smi" and args[:1] == ["topo"]:
+    print("        GPU0    GPU1\nGPU0     X      PHB\nGPU1    PHB      X")
+elif name == "nvidia-smi":
+    for i in range(gpus):
+        if "--query-gpu=index" in args:
+            print(i)
+        elif "--query-gpu=driver_version" in args:
+            print(driver)
+        else:
+            print("NVIDIA A100-SXM4-80GB, %s, 81920 MiB" % driver)
 elif name == "docker" and args[:1] == ["version"]:
     print("docker client 27.3.1, server 27.3.1")
 elif name == "openssl" and args[:1] == ["req"]:
@@ -51,7 +59,7 @@ elif name == "ss":
 '''
 
 
-def run_script(script, driver="580.82.07"):
+def run_script(script, driver="580.82.07", gpus=1):
     """Runs the startup script with the fakes first on PATH, as a normal
     user (so its sudo path runs too). Returns (process, VM dir, calls)."""
     tmp = tempfile.mkdtemp()
@@ -67,7 +75,7 @@ def run_script(script, driver="580.82.07"):
         f.write(script)
     calls = os.path.join(tmp, "calls.jsonl")
     env = {"PATH": bin_dir + ":/usr/bin:/bin", "HOME": tmp, "QWEN38_DIR": vm_dir,
-           "FAKE_CALLS": calls, "FAKE_DRIVER": driver}
+           "FAKE_CALLS": calls, "FAKE_DRIVER": driver, "FAKE_GPUS": str(gpus)}
     proc = subprocess.run(["bash", path], env=env, capture_output=True, text=True, timeout=60)
     recorded = [json.loads(line) for line in open(calls)] if os.path.exists(calls) else []
     return proc, vm_dir, recorded
@@ -162,4 +170,64 @@ log = open(os.path.join(vm, "start.log")).read()
 assert "sha256 Fingerprint=AA:BB:CC" in log and "firewall: deny incoming except SSH and 8443" in log, log
 assert KEY not in log + proc.stdout + proc.stderr
 
-print("ok: create request, script syntax, stage A and B commands, driver check")
+# 6. The vLLM flags: one GPU is exactly the list checked against deploy.py at
+#    68cff7e (phase 4 task 1.2); two GPUs add only the split, at the end.
+PHASE4_FLAGS = [
+    "--max-model-len", "250000", "--kv-cache-dtype", "fp8", "--gpu-memory-utilization", "0.9",
+    "--reasoning-parser", "qwen3", "--default-chat-template-kwargs", '{"reasoning_effort": "low"}',
+    "--enable-auto-tool-choice", "--tool-call-parser", "qwen3_xml",
+    "--speculative-config", '{"method": "mtp", "num_speculative_tokens": 3}',
+]
+assert sd.vllm_flags() == PHASE4_FLAGS and sd.vllm_flags(1) == PHASE4_FLAGS, sd.vllm_flags()
+assert sd.vllm_flags(2) == PHASE4_FLAGS + ["--tensor-parallel-size", "2"], sd.vllm_flags(2)
+
+# 7. One GPU: the script is byte for byte the phase 4 script (saved before this change).
+for https, name in ((False, "http"), (True, "https")):
+    golden = open(os.path.join(HERE, "data", "startup_script_phase4_%s.sh" % name)).read()
+    assert sd.startup_script(KEY, https=https) == golden, name
+    assert sd.startup_script(KEY, https=https, tensor_parallel=1) == golden, name
+
+# 8. Two GPUs, stage A: GPU check passes, topology logged, --ipc=host, the split passed.
+script_tp = sd.startup_script(KEY, https=False, tensor_parallel=2)
+script_tp_b = sd.startup_script(KEY, https=True, tensor_parallel=2)
+for s in (script_tp, script_tp_b):
+    check = subprocess.run(["bash", "-n"], input=s, capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr
+proc, vm, calls = run_script(script_tp, gpus=2)
+assert proc.returncode == 0, proc.stdout + proc.stderr
+run = docker_run(calls)
+assert run == [
+    "run", "-d", "--name", "qwen38", "--restart", "on-failure:3", "--gpus", "all",
+    "--ipc=host", "-p", "8000:8000",
+    "-v", vm + "/hf-cache:/root/.cache/huggingface",
+    "--env-file", vm + "/vllm.env", "-e", "HF_HUB_DISABLE_XET=1",
+    "vllm/vllm-openai:v0.30.0",
+    "Qwen/Qwen3.8-27B-FP8", "--host", "0.0.0.0", "--port", "8000",
+] + PHASE4_FLAGS + ["--tensor-parallel-size", "2"], run
+assert "--shm-size" not in run, run
+log = open(os.path.join(vm, "start.log")).read()
+assert "start: mode=http port=8000 image=vllm/vllm-openai:v0.30.0 tensor_parallel=2" in log, log
+assert "GPUs: 2, tensor parallel 2; topology:" in log and "GPU0     X      PHB" in log, log
+assert ["topo", "-m"] in [c["args"] for c in calls if c["cmd"] == "nvidia-smi"], calls
+assert KEY not in log + proc.stdout + proc.stderr
+
+# 9. Two GPUs requested, one found: stop before pulling or starting anything.
+proc, vm, calls = run_script(script_tp, gpus=1)
+assert proc.returncode != 0
+assert "FATAL: 2 GPUs requested, 1 found" in proc.stdout, proc.stdout
+assert not [c for c in calls if c["cmd"] == "docker"], calls
+
+# 10. Two GPUs, stage B: the firewall and TLS are unchanged, the split comes after
+#     the shared flags and before the TLS flags.
+proc, vm, calls = run_script(script_tp_b, gpus=2)
+assert proc.returncode == 0, proc.stdout + proc.stderr
+run = docker_run(calls)
+assert "--ipc=host" in run and run[run.index("-p") + 1] == "8443:8443" and run.count("-p") == 1, run
+serve = run[run.index("vllm/vllm-openai:v0.30.0") + 1:]
+assert serve == ["Qwen/Qwen3.8-27B-FP8", "--host", "0.0.0.0", "--port", "8443"] + PHASE4_FLAGS + \
+    ["--tensor-parallel-size", "2", "--ssl-keyfile", "/tls/key.pem", "--ssl-certfile", "/tls/cert.pem"], serve
+ufw = [c["args"] for c in calls if c["cmd"] == "ufw"]
+assert ufw[0] == ["--force", "reset"] and ["allow", "8443/tcp"] in ufw, ufw
+
+print("ok: create request, script syntax, stage A and B commands, driver check,"
+      " flags and scripts for 1 and 2 GPUs, GPU-count check")

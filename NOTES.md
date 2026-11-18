@@ -48,7 +48,9 @@ used.
 | 2026-10-01 | Operator's VM, 11:09–11:30 UTC (A100): gateway setup; the first connection test failed while the model was still starting | **$0.44** | ~$41.50 | Shadeform's final `cost_estimate` |
 | 2026-10-01 | Operator's VM, 11:44–12:38 UTC (A100, via `--gpu A100`): gateway validated by the operator | **$1.20** | ~$40.31 | Shadeform's final `cost_estimate` |
 | 2026-10-01 | Stage B VM, 12:46–13:27 UTC (A100, `--https`): HTTPS, firewall, gateway via the vLLM provider; then `down` | **$0.88** | ~$39.43 | Shadeform's final `cost_estimate` |
-| 2026-10-01 | **Phase 4 total: $3.19 of the $5 ceiling**, 4 VMs, none left running | | **~$39.43** (dashboard confirmation pending, task 6.6) | sum of the four |
+| 2026-10-01 | **Phase 4 total: $3.19 of the $5 ceiling**, 4 VMs, none left running | | **$39.42** on the dashboard (2026-10-04): $3.20 spent, matching the estimates | sum of the four; dashboard |
+| 2026-10-04 | **Phase 5 start** (`shadeform-tensor-parallel` task 3.1). `offers --tensor-parallel 2 --gpu A100` shows MassedCompute 2x A100 at $2.70/hr (PCIe, no NVLink); a 2-GPU test run approved; phase 5 ceiling $5 | — | **~$39.43** | operator ("about $39.43") |
+| 2026-10-04 | 2x A100 tensor-parallel VM, active 11:13–11:29 UTC (10 min of provider start not billed): start, speed, eval, 8 at once; then `down` | **$0.70** | ~$38.72 | Shadeform's final `cost_estimate` |
 
 **Phase 2 budget reality.** $16.15 remains against an original $30. The cost
 pilot alone needs roughly $20.60 (about 7 GPU-hours at ~$2.94/hr), so **the
@@ -951,6 +953,40 @@ operator's two runs took about 14 minutes.
 - **Without `--ssh-key-id`,** Shadeform installs the account's default key, and the VM can't be read over SSH.
 - **`/info` of a deleted instance answers 200 with `status: deleted`,** not 404.
 - **The gateway's Test Connect fails until READY,** because vLLM isn't listening yet. Start the VM about 15 minutes before it's needed.
+
+## Phase 5: two GPUs on one Shadeform VM (2026-10-04)
+
+`shadeform_deploy.py up --tensor-parallel 2 --gpu A100` on MassedCompute
+`A100_80Gx2` (desmoines-usa-1, $2.70/hr). `nvidia-smi topo -m` shows **PHB**:
+the GPUs connect through the CPU's PCIe host bridge, with no NVLink. vLLM
+reported **no GPU peer-to-peer**, so tensor parallelism ran over NCCL through
+host memory.
+
+| | 1x A100 | 2x A100, tensor parallel 2 |
+|---|---|---|
+| Price | $1.38/hr | $2.70/hr |
+| Weights per GPU | 29.38 GiB | 14.99 GiB |
+| KV cache | 1,072,674 tokens (4.29 full 250K requests) | **2,933,139 tokens (11.73)**, 2.7x |
+| One person writing (`decode_bench`) | 77.5 tok/s | 82.9 tok/s (+7%) |
+| **8 at once**: first visible word p50 / p95 | **13.3 / 23.6 s** (phase 3, Modal) | 20.8 / 35.0 s |
+| **8 at once**: writing p50 / p5 | **75.3 / 66.3 tok/s** | 48.9 / 43.2 tok/s |
+| **8 at once**: total throughput | **392–435 tok/s** | 307 tok/s |
+| SQL eval / tool call | pass / pass | pass / pass |
+| Active → READY | 12m08s | 11m27s |
+| Provider start (not billed) | ~3 min | **10 min** |
+| Run cost | $0.68 (32 min, phase 4) | **$0.70** (16 min active) |
+
+The 8-at-once baseline is phase 3's Modal A100 on the identical workload. The
+Shadeform A100 matched Modal within 6% on single-stream speed (phase 4).
+
+**Verdict: on this hardware, tensor parallelism is not worth it.**
+- **For many people at once it is worse:** about 35% slower writing, and it misses the 20 s target that one A100 already missed, at twice the price.
+- **Why:** without peer-to-peer, every layer of every token sends its partial results through host memory. With 8 requests in a batch, that traffic outweighs the second GPU's compute.
+- **What it does give** is 2.7x the KV cache. That matters only when many very long prompts run at once; at 8 interactive users the peak KV use was 5%.
+- **To serve more people,** two single-A100 VMs behind the gateway (the same price) should beat this. That's untested.
+- **A pair with NVLink** might turn the result around. None was offered; every 2-GPU offer listed on 2026-10-04 was PCIe.
+
+**Also found:** vLLM's `--api-key` protects only `/v1`. `/metrics` and `/health` answer without the key on every VM, single or multi-GPU: server counters, never prompts. This is recorded for a later fix (stage B's firewall doesn't help, because 8443 is open).
 
 ## Open items
 

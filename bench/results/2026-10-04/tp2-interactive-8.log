@@ -1,0 +1,107 @@
+14:26:29 tp2-interactive-8: 8 in flight, 30 requests (24 measured), cap 240 s
+sampler: running        <- vllm:num_requests_running
+sampler: waiting        <- vllm:num_requests_waiting
+sampler: kv_usage       <- vllm:kv_cache_usage_perc
+sampler: preemptions    <- vllm:num_preemptions_total
+sampler: prefix_hits    <- vllm:prefix_cache_hits_total
+sampler: prefix_queries <- vllm:prefix_cache_queries_total
+sampler: gen_tokens     <- vllm:generation_tokens_total
+✔ OpenAIHTTPBackend backend validated with model Qwen/Qwen3.8-27B-FP8
+  {'kind': 'openai_http', 'target': 'http://216.81.248.162:8000', 'model':      
+  'Qwen/Qwen3.8-27B-FP8', 'request_format': '/v1/chat/completions', 'api_key':  
+  '**********', 'api_routes': {'/health': 'health', '/v1/models': 'v1/models',  
+  '/v1/completions': 'v1/completions', '/v1/chat/completions':                  
+  'v1/chat/completions', '/v1/embeddings': 'v1/embeddings', '/v1/responses':    
+  'v1/responses', '/v1/audio/transcriptions': 'v1/audio/transcriptions',        
+  '/v1/audio/translations': 'v1/audio/translations', '/pooling': 'pooling'},    
+  'timeout': None, 'timeout_connect': 5.0, 'http2': True, 'follow_redirects':   
+  True, 'verify': False, 'validate_backend': True, 'stream': True, 'extras':    
+  {'method': None, 'stream': None, 'headers': None, 'params': None, 'body':     
+  {'temperature': 0}, 'files': None, 'content': None}, 'max_tokens': 4000,      
+  'server_history': False, 'tool_call_missing_behavior': 'error_stop',          
+  'multiturn_reasoning': False}                                                 
+✔ Tokenizer resolved, Using tokenizer 'Qwen/Qwen3.8-27B-FP8' from arguments
+  {'kind': 'huggingface_auto', 'model': 'Qwen/Qwen3.8-27B-FP8', 'load_kwargs':  
+  {}}                                                                           
+✔ 1 datasets resolved
+  [{'kind': 'json_file', 'load_kwargs': {'split': 'train'}, 'path':             
+  'bench/datasets/interactive.json'}]                                           
+✔ 2 preprocessors resolved
+  [{'kind': 'generative_column_mapper', 'column_mappings': None}, {'kind':      
+  'encode_media', 'audio_kwargs': {}, 'image_kwargs': {}, 'video_kwargs': {}}]  
+✔ Finalizer resolved
+  {'kind': 'generative', 'tool_call_mode': 'client'}                            
+✔ Request loader resolved with inf unique requests
+  {'kind': 'pytorch', 'samples': -1, 'shuffle': False, 'num_workers': 1}        
+✔ ConcurrentProfile profile resolved
+  {'kind': 'concurrent', 'rampup_duration': 0.0, 'warmup': {'percent': None,    
+  'value': None, 'mode': 'prefer_duration'}, 'cooldown': {'percent': None,      
+  'value': None, 'mode': 'prefer_duration'}, 'streams': [8]}                    
+✔ Output formats resolved
+  [{'kind': 'json', 'path': 'bench/results/2026-10-04/tp2-interactive-8.json'}] 
+✔ Setup complete, starting benchmarks...
+
+
+
+
+
+ℹ Run Summary Info
+|============|==========|==========|=======|======|======|========|=====|=====|=========|=====|=====|
+| Benchmark  | Timings                               ||||| Input Tokens     ||| Output Tokens     |||
+| Strategy   | Start    | End      | Dur   | Warm | Cool | Comp   | Inc | Err | Comp    | Inc | Err |
+|            |          |          | Sec   | Sec  | Sec  | Tot    | Tot | Tot | Tot     | Tot | Tot |
+|------------|----------|----------|-------|------|------|--------|-----|-----|---------|-----|-----|
+| concurrent | 14:27:04 | 14:28:51 | 106.3 | 0.0  | 0.0  | 7917.0 | 0.0 | 0.0 | 36873.0 | 0.0 | 0.0 |
+|============|==========|==========|=======|======|======|========|=====|=====|=========|=====|=====|
+
+
+ℹ Text Metrics Statistics (Completed Requests)
+|============|========|========|=======|=======|=======|=======|======|======|=======|========|=======|=======|
+| Benchmark  | Input Tokens                 |||| Input Words              |||| Input Characters            ||||
+| Strategy   | Per Request    || Per Second   || Per Request  || Per Second || Per Request   || Per Second   ||
+|            | Mdn    | p95    | Mdn   | Mean  | Mdn   | p95   | Mdn  | Mean | Mdn   | p95    | Mdn   | Mean  |
+|------------|--------|--------|-------|-------|-------|-------|------|------|-------|--------|-------|-------|
+| concurrent | 231.0  | 660.0  | 57.0  | 85.2  | 118.0 | 384.0 | 28.2 | 44.2 | 687.0 | 2161.0 | 180.5 | 273.3 |
+|============|========|========|=======|=======|=======|=======|======|======|=======|========|=======|=======|
+| Benchmark  | Output Tokens                |||| Output Words             |||| Output Characters           ||||
+| Strategy   | Per Request    || Per Second   || Per Request  || Per Second || Per Request   || Per Second   ||
+|            | Mdn    | p95    | Mdn   | Mean  | Mdn   | p95   | Mdn  | Mean | Mdn   | p95    | Mdn   | Mean  |
+|------------|--------|--------|-------|-------|-------|-------|------|------|-------|--------|-------|-------|
+| concurrent | 1144.0 | 2141.0 | 338.8 | 396.7 | 161.0 | 295.0 | 34.5 | 52.4 | 978.0 | 2093.0 | 211.8 | 347.2 |
+|============|========|========|=======|=======|=======|=======|======|======|=======|========|=======|=======|
+
+
+ℹ Request Token Statistics (Completed Requests)
+|============|=======|=======|========|========|========|========|=======|=======|=========|========|
+| Benchmark  | Input Tok    || Output Tok     || Total Tok      || Stream Iter  || Output Tok      ||
+| Strategy   | Per Req      || Per Req        || Per Req        || Per Req      || Per Stream Iter ||
+|            | Mdn   | p95   | Mdn    | p95    | Mdn    | p95    | Mdn   | p95   | Mdn     | p95    |
+|------------|-------|-------|--------|--------|--------|--------|-------|-------|---------|--------|
+| concurrent | 231.0 | 660.0 | 1144.0 | 2141.0 | 1357.0 | 2414.0 | 322.0 | 610.0 | 3.5     | 3.7    |
+|============|=======|=======|========|========|========|========|=======|=======|=========|========|
+
+
+ℹ Request Latency Statistics (Completed Requests)
+|============|=========|========|=======|========|=========|=========|======|======|======|======|
+| Benchmark  | Request Latency || TTFT          || TTFOT            || ITL        || TPOT       ||
+| Strategy   | Sec             || ms            || ms               || ms         || ms         ||
+|            | Mdn     | p95    | Mdn   | p95    | Mdn     | p95     | Mdn  | p95  | Mdn  | p95  |
+|------------|---------|--------|-------|--------|---------|---------|------|------|------|------|
+| concurrent | 24.9    | 42.7   | 829.4 | 2359.5 | 20806.3 | 35539.4 | 20.1 | 22.9 | 21.3 | 24.2 |
+|============|=========|========|=======|========|=========|=========|======|======|======|======|
+
+
+ℹ Server Throughput Statistics (All Requests)
+|============|=======|======|=========|==============|===============|==============|
+| Benchmark  | Requests             ||| Input Tokens | Output Tokens | Total Tokens |
+| Strategy   | Concurrency || Per Sec | Per Sec      | Per Sec       | Per Sec      |
+|            | Mdn   | Mean | Mean                                               ||||
+|------------|-------|------|---------|--------------|---------------|--------------|
+| concurrent | 8.0   | 7.5  | 0.3     | 74.5         | 346.8         | 421.3        |
+|============|=======|======|=========|==============|===============|==============|
+
+
+
+✔ Benchmarking complete, generated 1 benchmark(s)
+…   json    : bench/results/2026-10-04/tp2-interactive-8.json
+14:28:56 tp2-interactive-8: done -> bench/results/2026-10-04/tp2-interactive-8.json

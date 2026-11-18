@@ -894,3 +894,48 @@ it's open** ($1.38 ÷ $2.94 ≈ 47%).
    - a port that should be closed but isn't.
 
    The first paid start then only has to confirm what the fakes can't: the real provider, driver and network.
+
+---
+
+# Phase 5 — Two GPUs for one model
+
+## Part 13 — Tensor parallelism: when two GPUs help, and when they don't
+
+**Tensor parallelism splits every layer of the model across several GPUs.**
+Each GPU holds half the weights and does half the maths, then they exchange
+results after every layer, for every token. The tool makes it a per-run choice
+(`up --tensor-parallel 2`); without it, nothing changes.
+
+**What it buys:**
+- **Memory.** Half the weights per GPU means much more room for the KV cache: 2.93M tokens instead of 1.07M on the A100 pair.
+- **Compute,** in theory: two GPUs' worth.
+
+**What it costs:**
+- **Communication.** The exchange after every layer is cheap over NVLink (hundreds of GB/s, GPU to GPU) and expensive over PCIe through the CPU, which is what the only available pair had.
+- **Twice the hourly price.**
+
+**What the measurement showed:**
+
+| 8 people at once | 1x A100 | 2x A100 over PCIe, no peer-to-peer |
+|---|---|---|
+| Writing speed per person | **75 tok/s** | 49 tok/s |
+| First visible word, slowest 5% | **23.6 s** | 35.0 s |
+
+**The lesson: the link between GPUs decides it, not the number of GPUs.**
+`nvidia-smi topo -m` tells you before you pay for a measurement:
+- `NV#` means NVLink;
+- `PHB` / `SYS` mean PCIe through the CPU.
+
+The tool logs it in every multi-GPU start.
+
+**Two ways to use two GPUs:**
+
+| | One VM, model split (tensor parallel) | Two VMs, one model each (replication) |
+|---|---|---|
+| Good for | very long prompts at once (memory); speed per person, **only with NVLink** | more people at once |
+| Over PCIe | slower than one GPU (measured) | no GPU-to-GPU traffic at all |
+| If one fails | everything stops | the other keeps serving |
+| Needs | `up --tensor-parallel 2` | `up` twice, the same public name in the gateway |
+
+For this team today, with only PCIe pairs on offer: **one A100, and a second
+VM when one isn't enough.**

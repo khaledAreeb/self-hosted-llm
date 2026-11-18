@@ -262,6 +262,51 @@ rc, out = run(["down", current], env, d)                                 # by id
 assert rc == 0 and api.deletes() == [expired, current], out
 api.stop()
 
+# --- tensor parallel: refused values, the 2-GPU path, a wrong machine ----------
+MULTI = json.load(open(os.path.join(HERE, "data", "shadeform_types_multigpu_sample.json")))["instance_types"]
+api = FakeShadeform(SF_KEY, MULTI)
+url = api.start()
+d = workdir()
+rc, out = run(["up", "--hours", "1", "--yes", "--tensor-parallel", "3"], tool_env(url, d), d)
+# Python 3.12+ argparse quotes the rejected value ('3'); older versions don't.
+assert rc == 2 and ("invalid choice: 3" in out or "invalid choice: '3'" in out) and api.creates() == [], out
+rc, out = run(["up", "--hours", "1", "--yes", "--tensor-parallel", "2", "--gpu", "B200"], tool_env(url, d), d)
+assert rc == 1 and "no usable offer right now for those filters" in out and api.creates() == [], out
+vllm = FakeVLLM(VK)
+rc, out = run(["up", "--hours", "1", "--yes", "--tensor-parallel", "2", "--gpu", "A100"],
+              tool_env(url, d, p8000=vllm.start()), d)
+assert rc == 0, out
+[create] = api.creates()
+assert (create["cloud"], create["shade_instance_type"]) == ("massedcompute", "A100_80Gx2"), create
+assert create["auto_delete"]["spend_threshold"] == "2.97", create["auto_delete"]   # 1 h x $2.70 x 1.1
+script = base64.b64decode(create["launch_configuration"]["script_configuration"]["base64_script"]).decode()
+assert "--tensor-parallel-size 2" in script and "--ipc=host" in script and "--shm-size" not in script
+assert "GPUs      2 x A100_80G (80 GB each), tensor parallel 2, link: PCIe, no NVLink (per Shadeform)" in out, out
+assert "$2.70/hr for the whole VM" in out and "all 2 in use" in out and "READY after" in out, out
+assert api.deletes() == [], out
+api.stop(); vllm.stop()
+
+api = FakeShadeform(SF_KEY, MULTI, report_gpus=1)     # Shadeform hands over a 1-GPU machine
+url = api.start()
+d = workdir()
+began = time.time()
+rc, out = run(["up", "--hours", "1", "--yes", "--tensor-parallel", "2"], tool_env(url, d, p8000=closed_port()), d)
+[iid] = api.instances
+assert rc == 1 and "Shadeform's VM has 1 GPU(s), 2 were requested" in out, out
+assert api.deletes()[:1] == [iid] and "billing has stopped" in out, out
+assert time.time() - began < 10, "deleted within seconds, not after the start limit"
+api.stop()
+
+api = FakeShadeform(SF_KEY, MULTI)
+url = api.start()
+d = workdir()
+rc, out = run(["offers", "--tensor-parallel", "2"], tool_env(url, d), d)
+assert rc == 0 and "2 GPUs on one VM" in out and "A100_80Gx2" in out and "A6000x2" not in out, out
+assert "newest host CUDA is 12.2" in out and "PCIe, no NVLink" in out, out
+rc, out = run(["offers"], tool_env(url, d), d)                        # the default: one GPU
+assert rc == 0 and "Usable now (1 GPU" in out and "A100_80Gx2" not in out and "link" not in out, out
+api.stop()
+
 # --- offers through the CLI, with the key and without ------------------------
 api, url = fresh()
 d = workdir()
@@ -314,4 +359,4 @@ for text in OUTPUTS:
     assert SF_KEY not in text and VK not in text, text
 
 print("ok: up (normal, capacity, never ready, Ctrl-C, kill, error, open endpoint, refusals, https),"
-      " down, status, reap, offers, secrets")
+      " tensor parallel (refusals, 2-GPU path, wrong machine), down, status, reap, offers, secrets")

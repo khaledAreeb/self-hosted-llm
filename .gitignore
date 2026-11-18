@@ -42,3 +42,12 @@ eval/images/
 
 # Load-test tooling (GuideLLM + CPU torch) lives in its own environment.
 bench/.venv/
+
+# eval/run_eval.py copies deploy.py next to its results. For runs served by a
+# Shadeform VM that copy is NOT the serving configuration, so it stays local
+# (see the README.md in each of these folders).
+eval/results/2026-10-01/deploy.py
+eval/results/2026-10-04/deploy.py
+
+# Personal, unrelated work-in-progress notes.
+deploy_on_azure

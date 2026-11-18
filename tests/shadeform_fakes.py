@@ -30,8 +30,11 @@ class FakeShadeform:
     capacity vanishes between listing and creating."""
 
     def __init__(self, key, types, boot=("creating", "pending_provider", "pending", "active"),
-                 capacity_failures=0):
+                 capacity_failures=0, report_gpus=None):
+        """report_gpus: the GPU count /info reports, to fake a wrong machine;
+        by default the count of the instance type that was ordered."""
         self.key, self.types, self.boot = key, types, list(boot)
+        self.report_gpus = report_gpus
         self.capacity_failures = capacity_failures
         self.instances = {}
         self.calls = []                 # (method, path, parsed body)
@@ -84,7 +87,8 @@ class FakeShadeform:
                             fake.capacity_failures -= 1
                             return self._send(400, {"error": "instance type is out of capacity"})
                         iid = fake.add(body["name"], status=fake.boot[0], cloud=body["cloud"],
-                                       region=body["region"], request=body)
+                                       region=body["region"], request=body,
+                                       num_gpus=fake.report_gpus or fake._gpus_of(body))
                         return self._send(200, {"id": iid})
                     parts = self.path.strip("/").split("/")
                     if len(parts) == 3 and parts[0] == "instances" and parts[2] == "delete":
@@ -107,8 +111,14 @@ class FakeShadeform:
             i["ip"] = "127.0.0.1"
             i["info_calls_active"] = i.get("info_calls_active", 0) + 1
 
+    def _gpus_of(self, body):
+        for t in self.types:
+            if (t.get("cloud"), t.get("shade_instance_type")) == (body["cloud"], body["shade_instance_type"]):
+                return (t.get("configuration") or {}).get("num_gpus")
+        return 1
+
     def add(self, name, status="active", cloud="massedcompute", region="desmoines-usa-1",
-            created_minutes_ago=0, request=None):
+            created_minutes_ago=0, request=None, num_gpus=1):
         iid = str(uuid.uuid4())
         created = _now() - datetime.timedelta(minutes=created_minutes_ago)
         self.instances[iid] = {
@@ -119,6 +129,7 @@ class FakeShadeform:
             "created_at": created.strftime("%Y-%m-%dT%H:%M:%S.000000Z"),
             "launch_configuration": (request or {}).get("launch_configuration"),
             "auto_delete": (request or {}).get("auto_delete"),
+            "configuration": {"num_gpus": num_gpus},
         }
         return iid
 

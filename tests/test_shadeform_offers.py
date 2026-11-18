@@ -72,6 +72,36 @@ assert rows(u) == [("massedcompute", "beltsville-usa-1", 138), ("massedcompute",
 u, n = sd.split_offers(TYPES, gpus=["H100", "A100"], regions=["france", "desmoines"])
 assert rows(u) == [("massedcompute", "desmoines-usa-1", 138), ("scaleway", "paris-france-1", 330)], rows(u)
 
+# 4c. Tensor parallel: exactly N GPUs, 80 GB+ each, the same CUDA rule.
+#     The one-GPU result on the phase 4 sample is the same with N=1 given explicitly.
+assert sd.split_offers(TYPES, tensor_parallel=1) == sd.split_offers(TYPES)
+MULTI = json.load(open(os.path.join(HERE, "data", "shadeform_types_multigpu_sample.json")))["instance_types"]
+u, n = sd.split_offers(MULTI)                                   # default: one GPU only
+assert rows(u) == [("massedcompute", "desmoines-usa-1", 138)] and n == [], (rows(u), n)
+u, n = sd.split_offers(MULTI, tensor_parallel=2)
+assert rows(u) == [("massedcompute", "desmoines-usa-1", 270),   # whole-VM price, cheapest first
+                   ("scaleway", "paris-france-1", 660)], rows(u)
+assert all(r["num_gpus"] == 2 and r["link"] == "PCIe, no NVLink" for r in u), u
+assert u[1]["os"] == "ubuntu24.04_cuda13.0_shade_os", u[1]           # the CUDA 13 image is chosen
+assert [(r["cloud"], r["region"], r["price_cents"], r["reason"]) for r in n] == [
+    ("crusoe", "culpeper-usa-1", 400, "newest host CUDA is 12.2")], n
+shown = {(r["cloud"], r["instance_type"]) for r in u + n}
+for hidden in [("massedcompute", "A6000x2"),       # 48 GB per GPU: too small
+               ("crusoe", "A100_80Gx4"),           # 4 GPUs for a 2-way split
+               ("hyperstack", "A100_80Gx2"),       # not available now
+               ("massedcompute", "A100_sxm4_80G")]: # one GPU
+    assert hidden not in shown, hidden
+u, n = sd.split_offers(MULTI, tensor_parallel=4)                 # the 4-GPU VM has a CUDA 12 host
+assert u == [] and [(r["cloud"], r["num_gpus"]) for r in n] == [("crusoe", 4)], (u, n)
+u, n = sd.split_offers(MULTI, tensor_parallel=2, gpus=["H100"])
+assert rows(u) == [("scaleway", "paris-france-1", 660)] and n == [], (u, n)
+u, n = sd.split_offers(MULTI, tensor_parallel=2, gpus=["A100"], regions=["desmoines"])
+assert rows(u) == [("massedcompute", "desmoines-usa-1", 270)] and n == [], (u, n)
+assert sd.split_offers(MULTI, tensor_parallel=8) == ([], [])
+assert sd.link_text({"nvlink": True, "interconnect": "sxm5"}) == "NVLink"
+assert sd.gpu_summary(sd.split_offers(MULTI, tensor_parallel=2)[0][0], 2) == \
+    "2 x A100_80G (80 GB each), tensor parallel 2, link: PCIe, no NVLink (per Shadeform)"
+
 # 5. Nothing suitable: empty lists, so `up` creates nothing.
 assert sd.split_offers(TYPES, regions=["nowhere"]) == ([], [])
 assert sd.split_offers([]) == ([], [])
