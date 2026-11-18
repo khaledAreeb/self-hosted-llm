@@ -988,6 +988,19 @@ Shadeform A100 matched Modal within 6% on single-stream speed (phase 4).
 
 **Also found:** vLLM's `--api-key` protects only `/v1`. `/metrics` and `/health` answer without the key on every VM, single or multi-GPU: server counters, never prompts. This is recorded for a later fix (stage B's firewall doesn't help, because 8443 is open).
 
+## 2026-11-18 — Modal idle window: 60 minutes (operator)
+
+`IDLE_WINDOW_SECONDS` in `deploy.py` is now `60 * 60`. It was 10 minutes from
+2026-10-01 (ee16ce7), and 5 minutes before that.
+- **Cost:** each idle minute is ~$0.05 on the A100, so every burst of use now
+  ends with up to ~$2.94 of idle GPU, against ~$0.49 at 10 minutes.
+- **Benefit:** fewer cold starts (5–12 minutes each) for people who return
+  within the hour.
+- **Earlier cost reasoning in this log assumed 5 or 10 minutes.** Per-day
+  cost estimates made with those windows are now too low.
+- **Health checks:** LiteLLM's 300 s polling would now keep the GPU awake
+  for good, so the three suppressions in the README stay mandatory.
+
 ## Open items
 
 - [ ] Confirm CPU/memory really are billed additively (first invoice).

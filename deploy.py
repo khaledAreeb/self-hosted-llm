@@ -194,24 +194,24 @@ SPECULATIVE_CONFIG = '{"method": "mtp", "num_speculative_tokens": 3}'
 # and fragmentation; raising it gains little and risks OOM at startup.
 GPU_MEMORY_UTILIZATION = 0.90
 
-# Release the GPU after 5 minutes idle.
+# Release the GPU after 60 minutes idle.
 #
-# History: 5 minutes in phase 1, raised to 10 on 2026-09-27 (commit a27b967,
-# reason not recorded), back to 5 on 2026-09-30 by the operator to save
-# money. The trade: each idle minute costs ~$0.05 (at ~$2.94/hr) after every
-# burst of use; a shorter window meansit closed.
+# History: 5 minutes in phase 1, raised to 10 on 2026-09-27 (commit a27b967),
+# back to 5 on 2026-09-30 to save money, 10 again on 2026-10-01 (ee16ce7),
+# and 60 since 2026-11-18. Every change was the operator's choice.
 #
-# WARNING: 5 minutes is the same as LiteLLM's default health-check interval
-# (300 s). Background health checks MUST stay off (README, "LiteLLM gateway
-# configuration") or the gateway keeps the G more cold starts (5-12 min of GPU)
-# when someone comes back just after PU awake permanently.
+# The trade: each idle minute costs ~$0.05 (at ~$2.94/hr), so up to ~$2.94 of
+# idle GPU after every burst of use. In exchange, anyone who comes back within
+# the hour finds the model warm instead of waiting through a 5-12 minute cold
+# start. A shorter window is cheaper and means more cold starts.
 #
-# Modal's own example ships 15 minutes. For a bursty team that is ~90 min/day
-# of paid idle GPU -- about a third of the entire pilot budget, per day.
+# WARNING: LiteLLM's background health checks poll every 300 s, well inside
+# this window. They MUST stay off (README, "LiteLLM gateway configuration") or
+# the gateway keeps the GPU awake permanently.
 #
 # Do NOT drop below ~2 minutes: a user who pauses 90 seconds to read an answer
 # would otherwise trigger a cold start in the middle of their conversation.
-IDLE_WINDOW_SECONDS = 10 * 60
+IDLE_WINDOW_SECONDS = 60 * 60
 
 # A 28 GB model takes minutes to load. Modal's default startup_timeout is 5
 # SECONDS, which would kill the container while it is starting normally.
