@@ -93,7 +93,7 @@ MAX_MODEL_LEN = 250_000
 # Phase 2 ran BF16 on purpose: a community benchmark scored FP8 0.717 vs BF16
 # 0.833 at 256K context, and judging the MODEL on a weaker cache risked
 # blaming it for the SETTING. So FP8 is kept only if the six phase-2
-# long-document tasks still pass on it -- see NOTES.md, "FP8 long-document
+# long-document tasks still pass on it -- see docs/NOTES.md, "FP8 long-document
 # re-check". If they do not, the decision and its trade are recorded there.
 KV_CACHE_DTYPE = "fp8"
 
@@ -206,7 +206,7 @@ GPU_MEMORY_UTILIZATION = 0.90
 # start. A shorter window is cheaper and means more cold starts.
 #
 # WARNING: LiteLLM's background health checks poll every 300 s, well inside
-# this window. They MUST stay off (README, "LiteLLM gateway configuration") or
+# this window. They MUST stay off (docs/MODAL.md, "LiteLLM gateway configuration") or
 # the gateway keeps the GPU awake permanently.
 #
 # Do NOT drop below ~2 minutes: a user who pauses 90 seconds to read an answer

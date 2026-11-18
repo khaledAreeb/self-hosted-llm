@@ -999,7 +999,7 @@ Shadeform A100 matched Modal within 6% on single-stream speed (phase 4).
 - **Earlier cost reasoning in this log assumed 5 or 10 minutes.** Per-day
   cost estimates made with those windows are now too low.
 - **Health checks:** LiteLLM's 300 s polling would now keep the GPU awake
-  for good, so the three suppressions in the README stay mandatory.
+  for good, so the three suppressions in [MODAL.md](MODAL.md) stay mandatory.
 
 ## Open items
 

@@ -835,8 +835,8 @@ when the GPU sits idle. Shadeform rents you **a whole VM** from one of many GPU
 providers, at about half the hourly price ($1.38/hr for an A100 against
 ~$2.94/hr on Modal). The model and the vLLM flags are identical: they were
 checked flag for flag against `deploy.py`. What changes is everything *around*
-the model. The tool is `shadeform_deploy.py`, and the commands are in the
-README's "Shadeform" section.
+the model. The tool is `shadeform_deploy.py`, and the commands are in
+[SHADEFORM.md](SHADEFORM.md).
 
 ### What Modal did for us that we now do ourselves
 
@@ -844,7 +844,7 @@ README's "Shadeform" section.
 |---|---|---|
 | HTTPS at its edge | plain HTTP, every port open | `--https`: a self-signed certificate, and a firewall leaving only SSH and 8443 open |
 | Checked the token at its edge | anyone can reach the port | vLLM checks its own key (`VLLM_API_KEY`); `up` confirms that a request without it is refused |
-| Scale-to-zero after 5 idle minutes | **bills every minute until deleted** | a required `--hours`, Shadeform's auto-delete, `reap`, and `down` |
+| Scale-to-zero after the idle window (5 minutes then; 60 since 2026-11-18) | **bills every minute until deleted** | a required `--hours`, Shadeform's auto-delete, `reap`, and `down` |
 | A stable URL | a new IP on every `up` | prints the API Base to paste into the gateway |
 | Ran the CUDA version our image chose | the **host's driver** must support the container's CUDA | `offers` lists only hosts with a CUDA 13+ image, because the container is CUDA 13 |
 | Kept the weights in a Volume | nothing survives the VM | downloads 28 GB on every start (accepted for now) |
@@ -873,8 +873,9 @@ Use **`up --hours 1 --https`** before any company data goes through it.
 
 ### Which is cheaper depends on how busy the open hours are
 
-Modal charges more per hour, but only while it's working, plus 5 idle minutes
-after each burst. Shadeform charges less per hour, but for **every hour the VM
+Modal charges more per hour, but only while it's working, plus the idle window
+after each burst (5 minutes when this was measured; 60 since 2026-11-18, which
+makes Modal costlier for short bursts). Shadeform charges less per hour, but for **every hour the VM
 is open**, busy or not, plus a paid 15–25 minute start. A rough rule:
 **Shadeform is cheaper once the GPU is busy for more than about half the hours
 it's open** ($1.38 ÷ $2.94 ≈ 47%).

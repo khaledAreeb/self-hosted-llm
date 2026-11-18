@@ -1,424 +1,190 @@
-# Qwen3.8-27B on Modal
+# Self-hosted Qwen3.8-27B
 
-An on-demand, authenticated, OpenAI-compatible endpoint serving
-`Qwen/Qwen3.8-27B-FP8` with vLLM. It scales to zero when idle and starts only
-for authorized requests.
+A private, OpenAI-compatible API for **Qwen3.8-27B** (`Qwen/Qwen3.8-27B-FP8`),
+served by [vLLM](https://docs.vllm.ai) on one A100-80GB GPU. Prompts and
+documents stay on infrastructure we control, which is why this exists. It is
+not the cheapest way to use the model (see [What it costs](#what-it-costs)).
 
-Everything lives in one file: [`deploy.py`](deploy.py). Constants are at the top.
-
-**The same model can also run on a rented Shadeform VM**, at about half the
-hourly price but with no scale-to-zero. That is a separate, standalone tool,
-[`shadeform_deploy.py`](shadeform_deploy.py); see [Shadeform](#shadeform-rented-vms)
-below. It does not change anything here.
-
-The reasoning behind each choice is in
-[`openspec/changes/deploy-qwen38-27b-modal-pilot/design.md`](openspec/changes/deploy-qwen38-27b-modal-pilot/design.md).
-Running measurements and budget are in [`NOTES.md`](NOTES.md).
+- **250K-token context**, image input (vision), and tool calls for agents.
+- **Reasoning on at `low` effort** by default, adjustable per request.
+- **Works with any OpenAI client**: Copilot, OpenCode, LangChain or `curl`, usually through the team's LiteLLM gateway.
 
 ---
 
-## One-time setup
+## Two ways to run it
 
-```bash
-# 1. Install and authenticate
-./venv/bin/pip install modal
-./venv/bin/modal setup
-./venv/bin/modal profile current      # should print your workspace
+The model and the vLLM settings are the same in both. Choose by how busy the
+GPU will be.
 
-# 2. Create a proxy auth token for each consumer
-./venv/bin/modal workspace proxy-tokens create litellm-qwen
-```
+| | **Modal**, serverless: [`deploy.py`](deploy.py) | **Shadeform**, rented VM: [`shadeform_deploy.py`](shadeform_deploy.py) |
+|---|---|---|
+| You pay for | busy time, plus up to 60 idle minutes after each burst | every minute the VM exists |
+| A100-80GB price | ~$2.94/hr | ~$1.38/hr |
+| Starting | automatic on the first request: 5–10 min cold start | you run `up`: ready in ~15 min |
+| Stopping | automatic after 60 idle minutes | you run `down`, with a hard deadline as backup |
+| Address | one fixed HTTPS URL | a new IP on every `up` |
+| Good for | a few questions spread across the day | a team using it through a working session |
 
-The secret (`ws-...`) is shown **once**. Store the pair as the combined bearer
-form in a gitignored `.env`:
-
-```
-MODAL_PROXY_TOKEN=wk-<id>.ws-<secret>
-```
-
-Modal validates these at its **edge**, so the container never needs them — do
-not put them in a Modal Secret. They belong wherever the *caller* runs.
-
-```bash
-# 3. Download the weights -- run ONCE (~28 GB into a Modal Volume)
-./venv/bin/modal run deploy.py::download
-```
-
-Kept separate from serving on purpose: if the download happened on first boot,
-any cache miss would re-pull 28 GB and bill for the transfer.
+**Rule of thumb:** Shadeform is cheaper once the GPU is busy for more than
+about half the hours it's open.
 
 ---
 
-## Deploy
+## Quick start
+
+### 1. Use the model
+
+If the model is already running, you don't need any of the tools in this
+repo. Most people call it **through the team's LiteLLM gateway**: ask the
+gateway owner for a key and the model name.
+
+To call the Modal endpoint directly, you need a Modal proxy token
+(`wk-...ws-...`) from the workspace owner:
 
 ```bash
-./venv/bin/modal deploy deploy.py
-```
-
-Modal prints the endpoint URL with a key icon next to it, confirming proxy auth
-is on. Deploying costs nothing — no container starts until a request arrives.
-
-The live endpoint is:
-
-    https://dev-khaled-areeb--qwen38-27b-serve.modal.run
-
----
-
-## Call it
-
-```bash
-source .env
 curl https://dev-khaled-areeb--qwen38-27b-serve.modal.run/v1/chat/completions \
   -H "Authorization: Bearer $MODAL_PROXY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-        "model": "Qwen/Qwen3.8-27B-FP8",
-        "messages": [{"role": "user", "content": "Say hello in one sentence."}]
-      }'
+  -d '{"model": "Qwen/Qwen3.8-27B-FP8",
+       "messages": [{"role": "user", "content": "Say hello in one sentence."}]}'
 ```
 
-Add `"stream": true` for incremental tokens.
+**Before you rely on it:**
+- **The first request after a quiet hour can take 5–10 minutes** while the GPU starts. Set client and gateway timeouts to **900 s**.
+- **Allow enough `max_tokens`:** 4,000+ in general, 10,000+ for long documents. Reasoning counts against it, and too small a budget returns an empty answer.
+- **Change reasoning per request:** `"chat_template_kwargs": {"reasoning_effort": "medium"}` for hard problems, or `{"enable_thinking": false}` for none.
+- **Very long documents slow everyone down.** One ~137K-token read makes other users wait about 1.5 minutes, so keep huge documents for quiet times.
+- **Check written reports.** Facts and numbers come out right, but the model adds plausible details that weren't in the source, such as weekdays and causes.
 
-**Expect a slow first request.** The measured first-ever cold start was
-**602 seconds** (~10 min) on A100-80GB, which included one-off `torch.compile`
-and CUDA graph capture now cached in the `vllm_cache` Volume. Later cold starts
-should be faster; measure before relying on a shorter client timeout.
+### 2. Run it on Modal
 
-**Thinking is disabled by default.** This model ships with `xhigh` reasoning
-effort, which made it unusable: a request for a 400-word explanation spent all
-800 available tokens reasoning and returned `content: None`. The server now
-sets `--default-chat-template-kwargs '{"enable_thinking": false}'`.
+You need Python 3 and a Modal account.
 
-To get reasoning back for a hard question, ask for it per request — request-level
-kwargs always beat the server default:
-
-```json
-{
-  "model": "qwen3.8-27b",
-  "messages": [{"role": "user", "content": "..."}],
-  "chat_template_kwargs": {"enable_thinking": true}
-}
+```bash
+cp .env.example .env                                         # secrets stay in .env, which is git-ignored
+python3 -m venv venv && ./venv/bin/pip install modal
+./venv/bin/modal setup                                       # log in
+./venv/bin/modal workspace proxy-tokens create litellm-qwen  # put wk-...ws-... in .env as MODAL_PROXY_TOKEN
+./venv/bin/modal run deploy.py::download                     # once: 28 GB of weights into a Modal Volume
+./venv/bin/modal deploy deploy.py                            # free: nothing runs until the first request
 ```
 
-Set this on the **vLLM side**, not in LiteLLM: `chat_template_kwargs` is a vLLM
-extension rather than part of the OpenAI spec, so routing it through a proxy
-means trusting that proxy to forward a non-standard field.
+Full runbook, including the gateway configuration: **[docs/MODAL.md](docs/MODAL.md)**.
+
+### 3. Run it on Shadeform
+
+You need Python 3 only (no packages), and a Shadeform API key in `.env` as
+`SHADEFORM_API_KEY`.
+
+```bash
+python3 shadeform_deploy.py offers                  # free: usable GPUs, cheapest first
+python3 shadeform_deploy.py up --hours 2 --https    # PAID from here; prints the API Base once the model answers
+python3 shadeform_deploy.py status                  # free: what's running, cost so far, time left
+python3 shadeform_deploy.py down                    # deletes the VM; billing stops
+```
+
+- **`--hours` is required** (24 at most). It is a safety deadline: Shadeform's auto-delete removes the VM then even if you forget `down`, with `reap` as a backup (auto-delete hasn't yet been seen firing).
+- **Use `--https` for anything with company data.** Without it, traffic is plain HTTP.
+- **Failed starts clean up after themselves:** `up` deletes the VM if the model never starts or you press Ctrl-C.
+
+Full runbook: **[docs/SHADEFORM.md](docs/SHADEFORM.md)**.
+
+### 4. Connect the LiteLLM gateway
+
+- **Modal:** copy the config in [docs/MODAL.md](docs/MODAL.md#litellm-gateway-configuration) exactly. It turns off background health checks in three places; without them, the gateway's polling keeps the GPU awake for good (~$70 a day).
+- **Shadeform:** use the **vLLM provider** (`hosted_vllm/`), not `openai/`, with the API Base that `up` prints. Add `ssl_verify: false` with `--https`. The address changes on every `up`. Details: [docs/SHADEFORM.md](docs/SHADEFORM.md#connecting-the-gateway).
 
 ---
 
-## Operating notes
+## Rules that protect the budget
 
-**Idle window is 5 minutes** (was 10 from 2026-09-27 to 2026-09-30). Modal's own example ships 15, which for a bursty
-team is ~90 min/day of paid idle GPU. Do not drop below ~2 minutes: a user who
-pauses 90 seconds to read an answer would otherwise trigger a cold start
-mid-conversation.
-
-**How many people it serves (measured 2026-09-29, `bench/FINDINGS.md`).** One
-A100 handles **4 simultaneous interactive requests** within target: 95% of
-requests show their first visible word within 20 s. That is roughly **10–20
-people** chatting or coding, and **up to 8 coding agents** at once. Past that,
-nothing fails; answers get slower. At 8 simultaneous requests the first word
-typically takes ~13 s and the slowest ~24 s.
-
-**What users should expect at busy times:**
-- **One long document stalls everyone.** While someone's ~137K-token document is being read (about 1.5 minutes), everyone else's first word can take up to ~100 s. Warn the team, or keep huge documents for quiet times.
-- **Occasionally an empty answer.** The model can spend its whole budget thinking. Callers should allow `max_tokens` of 4,000+, and 10,000+ for document work.
-
-**One container, never two.** `max_containers=1` means a burst waits for the
-one GPU instead of silently starting a second A100 at full price. Raise it
-deliberately, with a budget, if one GPU is measured to be too slow for the team.
-
-**Serving config:** FP8 KV cache, MTP speculative decoding, thinking `low`.
-Each was measured, not assumed; see the comments in `deploy.py`. To re-measure
-capacity after any change, see `bench/README.md`.
-
-## LiteLLM gateway configuration
-
-> ### DO NOT ENABLE BACKGROUND HEALTH CHECKS FOR THIS MODEL
->
-> LiteLLM polls every configured model every **300 seconds** by default. The
-> idle window here is 300 seconds -- the same as the polling interval -- so
-> polling holds the GPU awake permanently. At ~$2.94/hr that drains a $30 budget in roughly **10 hours with
-> zero user requests** — and shortening the idle window makes it worse, not
-> better, because each cycle then pays a fresh cold start.
->
-> **Three** settings are required. One is not enough: there is an open LiteLLM
-> defect where the internal health check still crawls configured models despite
-> the per-model flag.
-
-This is the verified working configuration:
-
-```yaml
-model_list:
-  - model_name: qwen3.8-27b
-    litellm_params:
-      model: openai/Qwen/Qwen3.8-27B-FP8            # openai/ prefix + the name vLLM serves
-      api_base: https://dev-khaled-areeb--qwen38-27b-serve.modal.run/v1
-      api_key: os.environ/MODAL_PROXY_TOKEN         # the wk-....ws-... bearer form
-      timeout: 900                                  # must exceed the cold start
-      stream_timeout: 900
-    model_info:
-      disable_background_health_check: true         # suppression 3 of 3
-
-general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY
-  background_health_checks: false                   # suppression 1 of 3
-  health_check_skip_disabled_background_models: true  # suppression 2 of 3
-
-router_settings:
-  num_retries: 0        # a slow cold start must not multiply into containers
-
-litellm_settings:
-  num_retries: 0
-  telemetry: False
-```
-
-Keep this in a **separate config file** if your gateway serves other models —
-`num_retries: 0` applied globally would affect all of them.
-
-**Timeout must exceed the cold start.** Measured cold starts: 602 s, then
-514 s, then 428 s as the compile cache filled. 900 s leaves headroom. A shorter
-timeout fails requests while the backend is starting perfectly normally.
-
-**Verify suppression by billing, not by config.** Leave the gateway running
-overnight with no user activity and confirm the Modal dashboard shows zero
-GPU cost. Reading the config proves nothing — that is the whole point of the
-check. Do **not** stop the Modal app to make this pass; stopping it would
-conceal a polling defect rather than detect it.
-
-**Reasoning appears as `reasoning_content`.** LiteLLM renames the model's
-`reasoning` field to the conventional OpenAI-compatible name. With thinking
-disabled by default this is usually empty, but clients that request thinking
-per-request will receive it there rather than in `content`.
-
-**Never delete the Volumes to save money.** Storage is free below 1 TiB and
-these use ~33 GiB. Deleting saves nothing and costs a 28 GB re-download.
-
----
-
-## If something breaks
-
-| Symptom | Fix |
-|---|---|
-| Image fails to build | Adjust the CUDA tag in `deploy.py` |
-| `A100-40GB` rejected at deploy | Try `A100-80GB` or `L40S` |
-| Model loads but output is incoherent | Set `GPU = "L40S"` — the Ampere FP8-Marlin path is unverified against this model's DeltaNet layers |
-| `unrecognized arguments: --reasoning-parser` | Drop that flag from `serve()` |
-| Request fails while container is starting | Raise the caller's timeout above the cold start in `NOTES.md` |
-| `missing credentials for proxy authorization` | The caller is not forwarding the bearer token |
-
----
-
-## Shadeform (rented VMs)
-
-[`shadeform_deploy.py`](shadeform_deploy.py) runs the same model, with the
-same vLLM settings, on a GPU VM rented through Shadeform's marketplace. It is
-standalone: plain `python3`, no packages, no `modal`. `deploy.py` is untouched,
-and the Modal endpoint stays ready as a fallback.
-
-**The big difference from Modal: a VM bills from `up` until it is deleted,**
-whether anyone uses it or not. So you open it when the team needs it, and you
-close it afterwards. Every VM also gets a deadline when it is created:
-- **Shadeform's own auto-delete** removes the VM at the deadline;
-- **`reap`** deletes anything past its deadline, as a backup;
-- **`up` deletes the VM itself** if the model never starts, if the VM reports an error, or if you press Ctrl-C.
-
-### What you need first
-
-1. **A Shadeform account with a few dollars of credit.** One test costs about $1–2. The account is the company workspace, so the tool only touches instances named `qwen38-until-*`.
-2. **A dedicated API key.** Create a new one under Settings → API keys, not the Default key, and add it to `.env` (already git-ignored):
+1. **Modal: never enable background health checks** for this model in LiteLLM. Check by billing, not by config: leave the gateway running overnight and confirm zero GPU cost.
+2. **Modal: keep `max_containers=1`** unless a second GPU has a budget. A burst then waits for the one GPU instead of silently starting another.
+3. **Shadeform: every `up` gets a `down`.** As a backup, run `reap` every 15 minutes on an always-on machine:
    ```
-   SHADEFORM_API_KEY=<your key>
+   */15 * * * * cd /opt/deploy-llm && /usr/bin/python3 shadeform_deploy.py reap >> reap.log 2>&1
    ```
-3. **The key vLLM will require.** `VLLM_API_KEY` is generated and added to `.env` on the first `up`; the tool never prints it. To choose your own, add `VLLM_API_KEY=<16+ characters, no spaces>` first.
-4. **To read logs over SSH (optional):**
-   - download the "Shadeform Managed Key" from Settings → SSH Keys;
-   - or register your own key and pass `--ssh-key-id <id>` to `up`.
+4. **Never delete the Modal Volumes.** Storage is free, and deleting them costs a 28 GB re-download.
+5. **Secrets live only in `.env`:** `MODAL_PROXY_TOKEN`, `SHADEFORM_API_KEY`, `VLLM_API_KEY`. The file is git-ignored; keep it that way.
 
-### The commands
+---
 
-**`offers`** (free) lists GPUs that can run the model now, cheapest first:
-```bash
-python3 shadeform_deploy.py offers
-```
-```
-Usable now (1 GPU, 80 GB+, host CUDA 13.0+), cheapest first:
-    $/hr  type               provider        region             OS image
-    1.38  A100_sxm4_80G      massedcompute   desmoines-usa-1    ubuntu22.04_cuda13.0_shade_os
-    2.73  H100               massedcompute   desmoines-usa-1    ubuntu22.04_cuda13.0_shade_os
+## What to expect (measured)
 
-Not usable (the vllm/vllm-openai:v0.30.0 image needs a CUDA 13.0+ host driver):
-    1.35  A100_80G           hyperstack      montreal-canada-2  newest host CUDA is 12.8
-    1.50  A100_sxm4_80G      denvr           houston-usa-1      newest host CUDA is 12.4
-```
-That listing is real (2026-10-01, shortened). "Not usable" offers look cheaper
-but run older NVIDIA drivers, which can't start the pinned vLLM container.
-- **Filters:**
-  - `--gpu H100` matches any part of the GPU or instance type, to pick a stronger GPU than the cheapest;
-  - `--region france` matches any part of the region name;
-  - `--cloud massedcompute` matches the provider exactly;
-  - `--tensor-parallel 2` lists VMs with exactly 2 GPUs instead of 1 (see [Two GPUs on one VM](#two-gpus-on-one-vm-tensor-parallelism)).
-- **Applies to `up` too:** all these flags work there as well.
-
-**`up`** (PAID from the moment the VM is created) shows the plan, asks before
-creating, and finishes only when the model has answered a real question:
-```bash
-python3 shadeform_deploy.py up --hours 1            # stage A: plain HTTP, tests only
-python3 shadeform_deploy.py up --hours 1 --https    # stage B: HTTPS + firewall
-```
-- **`--hours` is required:** fractions are allowed, up to 24.
-- **`--yes`** skips the question, for scripts.
-- **If an offer has no capacity,** it tries the next one, up to 3.
-- **When it's ready,** it prints the gateway settings and the `down` command:
-```
-READY after 18m20s: the model answered 'ready'.
-
-Gateway (LiteLLM) settings for this model:
-  API Base            http://<ip>:8000/v1
-  API Key             the VLLM_API_KEY value in .env (not printed here)
-  Provider / Model    vLLM (hosted_vllm) / Qwen/Qwen3.8-27B-FP8
-  Timeout             900 s
-
-Close it when you are done; billing stops at once:
-  python3 shadeform_deploy.py down <id>
-```
-Before printing READY it also checks that a request **without** the key is
-refused, and in `--https` mode that plain HTTP and port 8000 are closed. If
-any check fails, the VM is deleted.
-
-**`status`** (free) lists this tool's VMs, with IP, price, cost so far and
-time left. A VM past its deadline is shown as `OVERDUE`:
-```bash
-python3 shadeform_deploy.py status
-```
-
-**`down`** deletes the VM and confirms that Shadeform has stopped billing.
-With no id, it deletes the tool's only running VM. If several are running, it
-refuses and lists them:
-```bash
-python3 shadeform_deploy.py down
-python3 shadeform_deploy.py down <id>
-```
-
-**`reap`** deletes every VM from this tool that is past its deadline, and
-nothing else. Run it on a schedule on an always-on machine, such as the
-gateway server. That machine needs only this file and a `.env` with
-`SHADEFORM_API_KEY`:
-```
-*/15 * * * * cd /opt/deploy-llm && /usr/bin/python3 shadeform_deploy.py reap >> reap.log 2>&1
-```
-
-### Two GPUs on one VM (tensor parallelism)
-
-**Optional, and off by default.** Without `--tensor-parallel`, nothing
-changes: one GPU, exactly the setup measured in phases 1–4. With it, `up`
-rents a VM with exactly that many GPUs and vLLM splits the model across them
-(`--tensor-parallel-size`):
-```bash
-python3 shadeform_deploy.py offers --tensor-parallel 2                  # free: 2-GPU VMs, whole-VM price
-python3 shadeform_deploy.py up --hours 1 --tensor-parallel 2 --gpu A100 # PAID: one VM, model on both GPUs
-```
-- **Live today (2026-10-04):** MassedCompute 2x A100 80GB at $2.70/hr (twice one A100), and Scaleway 2x H100 at $6.60/hr. Both are linked by **PCIe, no NVLink**. The `offers` listing and the READY output show the link.
-- **Always add `--gpu A100`** (or the type you mean). If the first offer has no capacity, `up` tries the next cheapest **2-GPU** offer, which today is the $6.60 H100 pair.
-- **Each GPU must have 80 GB or more,** the same rule as one GPU, so the cheap 48 GB pairs are not offered.
-- **The other guarantees are unchanged:** the deadline and spend cap (priced for the whole VM), the key, `--https`, deletion on failure, `down`, `reap`.
-
-**Measured on 2026-10-04: not worth it on today's offers.** The only usable
-pair (MassedCompute 2x A100, PCIe through the CPU, no GPU peer-to-peer) was
-compared with one A100:
-
-| | 1x A100, $1.38/hr | 2x A100 tensor parallel, $2.70/hr |
+| | Result | Source |
 |---|---|---|
-| 8 people at once: first word p50 / p95 | **13.3 / 23.6 s** | 20.8 / 35.0 s |
-| 8 people at once: writing speed | **75 / 66 tok/s** | 49 / 43 tok/s |
-| one person alone | 77.5 tok/s | 82.9 tok/s |
-| KV cache room | 1.07M tokens | **2.93M tokens** |
+| **People at once** | ~10–20 chatting or coding (4 simultaneous requests within the 20 s first-word target), or up to 8 coding agents | [bench/FINDINGS.md](bench/FINDINGS.md) |
+| **Answer quality** | 24 synthetic business tasks: 18 pass, 6 partial, 0 fail at `low`; 20 pass at `medium` | [eval/FINDINGS.md](eval/FINDINGS.md) |
+| **By area** | coding 6/6, long documents 5–6/6, vision 5/6, report writing 2–3/6 (embellishes) | [eval/FINDINGS.md](eval/FINDINGS.md) |
+| **Speed** | ~75 tokens/s per answer on short prompts, with MTP speculative decoding | [docs/NOTES.md](docs/NOTES.md) |
+| **Long context** | 250K tokens; a 3-step lookup across 195K tokens answered correctly | [eval/FINDINGS.md](eval/FINDINGS.md) |
+| **Two GPUs (tensor parallel)** | slower for 8 users at twice the price on today's PCIe pairs, so not recommended | [docs/NOTES.md](docs/NOTES.md), "Phase 5" |
 
-- **Two GPUs were slower for 8 people at once,** at twice the price, because without a direct link between them every token's work crosses the CPU.
-- **The only gain** is room for many very long prompts at once.
-- **To serve more people,** prefer two single-GPU VMs behind the gateway (`up` twice, the same public name). A pair with NVLink might change the result; none was offered.
-- **Details:** `NOTES.md`, "Phase 5".
+## What it costs
 
-### Stage A and stage B
+- **Modal:** ~$2.94/hr while the GPU is up ($2.50 GPU plus $0.44 CPU and memory). Up to ~$2.94 of idle time follows each burst.
+- **Shadeform:** $1.38/hr for an A100 while the VM exists, plus ~$0.34 for each 15-minute start.
+- **A full 9-to-5 month** is ~195 GPU-hours: ~$570 on Modal, or ~$270 on Shadeform with the VM open all those hours.
+- **For comparison,** the same model through a hosted API would likely cost $10–40 a month at our volume. Self-hosting buys data residency, not savings.
 
-| | Stage A: `up` | Stage B: `up --https` |
-|---|---|---|
-| Use for | tests and demos with **non-sensitive** questions | anything with company data |
-| Traffic | **plain HTTP: the key and every prompt are readable** on the way | encrypted (TLS, self-signed certificate) |
-| Open ports | everything the provider leaves open | SSH and 8443 only (UFW firewall) |
-| API Base | `http://<ip>:8000/v1` | `https://<ip>:8443/v1` |
+---
 
-**The self-signed certificate stops eavesdropping, but it isn't checked
-against a certificate authority.** `up --https` prints the certificate's
-SHA-256 fingerprint. To be sure you're talking to your VM, compare it over SSH
-with `openssl x509 -in /opt/qwen38/tls/cert.pem -noout -fingerprint -sha256`.
+## Repository layout
 
-### Connecting the gateway
+```
+deploy.py                  Modal app: image, weight download, vLLM server (every setting at the top, with its reason)
+shadeform_deploy.py        Shadeform CLI: offers / up / status / down / reap (standard library only)
+.env.example               the secrets each tool reads; copy to .env
 
-The address changes on every `up`, so update the model's **API Base** each time.
-The other settings stay the same:
+docs/
+  MODAL.md                 Modal runbook: setup, calling, gateway config, troubleshooting
+  SHADEFORM.md             Shadeform runbook: commands, HTTPS, two GPUs, troubleshooting
+  SHADEFORM_CODE_GUIDE.md  how shadeform_deploy.py works, section by section
+  GUIDE.md                 lessons learned: how to deploy, measure and judge an LLM yourself
+  NOTES.md                 dated log of every measurement, decision and dollar spent
 
-```yaml
-  - model_name: Qwen3.8-27B-FP8
-    litellm_params:
-      model: hosted_vllm/Qwen/Qwen3.8-27B-FP8   # the vLLM provider, not openai/ (see below)
-      api_base: http://<ip>:8000/v1        # stage B: https://<ip>:8443/v1
-      api_key: os.environ/QWEN_VM_KEY      # the VLLM_API_KEY value from .env
-      timeout: 900
-      stream_timeout: 900
-      ssl_verify: false                    # stage B only: the certificate is self-signed
+eval/                      capability evaluation: 24 tasks, graders, results  ->  eval/FINDINGS.md
+bench/                     load tests: how many people at once  ->  bench/README.md, bench/FINDINGS.md
+tests/                     offline tests for shadeform_deploy.py (fake API, fake vLLM, no cost)
+openspec/                  the plan for each phase (proposal, design, tasks); finished phases in archive/
 ```
 
-**Use the vLLM provider (`hosted_vllm/`), not `openai/`.** LiteLLM's `openai`
-provider ignores a per-model `ssl_verify`, so in stage B the gateway rejects the
-self-signed certificate. The symptom is "Connection error" in the gateway and a
-500 in Copilot, while vLLM's log shows no request arriving. This was measured on
-2026-10-01.
+## Tests
 
-In the gateway's web form, these are the same fields:
-- Provider: **vLLM**;
-- API Base;
-- API Key;
-- the model name `Qwen/Qwen3.8-27B-FP8`.
-
-Copilot and OpenCode don't change, because they talk to the gateway.
-
-Background health checks don't add cost here, because the VM bills anyway.
-But while the VM is closed they fail, and the gateway may mark the model
-unhealthy. That's expected.
-
-### What a start costs, and how long it takes
-
-**Measured on 2026-10-01, on one A100: about 15 minutes from `up` to READY**
-(details in `NOTES.md`):
-- the VM boots in about 3 minutes;
-- the 8.7 GB container downloads in about 2;
-- the 28 GB model downloads in 3–4.5, every time, because nothing is kept between VMs;
-- vLLM starts in about 4.
-
-You pay for those minutes: about $0.34 per start on the $1.38/hr A100. A
-2-GPU start took 11.5 minutes from active to READY, but the provider took 10
-minutes to start that VM (not billed).
-
-### If a start fails
-
-`up` deletes the VM, so look while it's starting. Once the VM is active, `up`
-prints its IP. Then, in another terminal:
-```bash
-ssh shadeform@<ip> 'tail -f /opt/qwen38/start.log'   # the startup script, step by step
-ssh shadeform@<ip> 'sudo docker logs -f qwen38'      # vLLM itself
-ssh shadeform@<ip> 'sudo journalctl -u init-script'  # Shadeform's view of the script
-```
-- **`FATAL: driver ... too old`:** the host can't run the CUDA 13 image. `offers` should have excluded it, so report it.
-- **`Shadeform's VM has 1 GPU(s), 2 were requested`** (with `--tensor-parallel`): Shadeform handed over a different machine. `up` deletes it at once, seconds after creating it.
-- **`FATAL: 2 GPUs requested, 1 found`** in `start.log`: the VM itself shows fewer GPUs than it should. vLLM never starts, and `up` deletes the VM at its start limit.
-- **How the GPUs are linked:** with `--tensor-parallel`, `start.log` holds the output of `nvidia-smi topo -m` (`NV#` means NVLink; `PHB`, `PXB` or `SYS` mean PCIe).
-- **The container keeps restarting:** read `docker logs`. On Modal, the H100 failed exactly like this.
-
-### Tests (free)
+All offline and free: no network, no GPU.
 
 ```bash
 python3 tests/test_shadeform_offers.py      # offer filtering, from a saved sample
-python3 tests/test_shadeform_script.py      # the VM's startup script for 1 and 2 GPUs, run with fake docker/ufw/nvidia-smi
+python3 tests/test_shadeform_script.py      # the VM startup script, run with fake docker/ufw/nvidia-smi
 python3 tests/test_shadeform_lifecycle.py   # every command against a fake Shadeform API and vLLM
+python3 bench/tests/test_sampler.py         # the load-test metrics sampler
 ```
+
+## If something goes wrong
+
+| Symptom | Likely cause and fix |
+|---|---|
+| First request times out | Cold start. Raise client and gateway timeouts to 900 s. |
+| `content: null` or an empty answer | Reasoning used the whole budget. Raise `max_tokens`. |
+| `missing credentials for proxy authorization` | The caller isn't sending `Authorization: Bearer <MODAL_PROXY_TOKEN>`. |
+| Modal bills GPU time overnight with no users | Gateway health checks are on. See [docs/MODAL.md](docs/MODAL.md#litellm-gateway-configuration). |
+| Gateway shows "Connection error" for a `--https` VM | Use the `hosted_vllm/` provider with `ssl_verify: false`. |
+| `shadeform_deploy.py up` fails | See [docs/SHADEFORM.md](docs/SHADEFORM.md#if-a-start-fails) for the logs to read over SSH. |
+
+More: [docs/MODAL.md](docs/MODAL.md#if-something-breaks).
+
+---
+
+## How it was built
+
+Five phases, each planned with [OpenSpec](openspec/) and logged in
+[docs/NOTES.md](docs/NOTES.md). Total spend was about $27 of Modal credit and
+$3.90 of Shadeform credit.
+
+1. **Deploy on Modal:** an authenticated, scale-to-zero endpoint, wired to LiteLLM, Copilot and OpenCode.
+2. **Judge the model:** 250K context verified, MTP speculative decoding (2.29x faster writing), and a 24-task evaluation.
+3. **Load test:** how many people one A100 serves; FP8 KV cache doubled capacity.
+4. **Rented VMs:** `shadeform_deploy.py`, at about half Modal's hourly price, with HTTPS and a firewall.
+5. **Two GPUs:** tensor parallelism measured and rejected on today's hardware.
+
+Want to do this yourself for another model? Start with [docs/GUIDE.md](docs/GUIDE.md).

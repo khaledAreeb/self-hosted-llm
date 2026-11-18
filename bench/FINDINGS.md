@@ -4,7 +4,7 @@ Measured 2026-09-29 on the configuration users now get: Qwen3.8-27B-FP8,
 one A100-80GB, 250K context, **FP8 KV cache, MTP on, `max_containers=1`**,
 thinking at `low`, temperature 0. Every number cites a file in
 `bench/results/2026-09-29/` (`<label>.json` plus `<label>.metrics.csv`) or an
-entry in `NOTES.md`. Method: `bench/README.md`. How to do it yourself:
+entry in `docs/NOTES.md`. Method: `bench/README.md`. How to do it yourself:
 `bench/GUIDE.md`.
 
 ## The answer
@@ -131,7 +131,7 @@ It never reverses.
 
 - **Accuracy:** 6/6 long-document tasks pass on FP8 (`eval/results/2026-09-29/*@fp8.md`). The one that ran out of room on BF16 now finishes with exact counts.
 - **Capacity:** doubled; the KV block went from 800 to 1,600 tokens.
-- **Single-request speed trade** (`NOTES.md`, "FP8 KV cache"):
+- **Single-request speed trade** (`docs/NOTES.md`, "FP8 KV cache"):
   - short-prompt generation 112.7 → 73.2 tok/s;
   - 137K-context generation 29 → 98 tok/s;
   - first reads 12–21% slower.
